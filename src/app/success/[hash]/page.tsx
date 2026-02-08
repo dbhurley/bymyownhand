@@ -50,7 +50,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
   const scoreInfo = session ? getScoreLabel(session.integrityScore || 0) : { label: '', color: '' };
 
   return (
-    <div className="min-h-screen bg-cream">
+    <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
       {/* Header */}
       <header className="flex items-center justify-between px-8 py-6 border-b border-deep-blue/10">
         <Link href="/" className="flex items-center gap-2">

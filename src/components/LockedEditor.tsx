@@ -179,9 +179,9 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-deep-blue/10 bg-cream">
+      <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-deep-blue/10 bg-cream">
         <div className="flex items-center gap-4">
           <input
             type="text"
@@ -210,7 +210,7 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
       </div>
 
       {/* Editor */}
-      <div className="flex-1 relative">
+      <div className="flex-1 min-h-0 relative overflow-hidden">
         <Editor
           height="100%"
           defaultLanguage="plaintext"
@@ -254,9 +254,12 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between px-6 py-4 border-t border-deep-blue/10 bg-cream">
+      <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-t border-deep-blue/10 bg-cream">
         <p className="text-sm text-deep-blue/60">
-          External paste is disabled. Write it yourself.
+          {wordCount < 10 
+            ? `Write at least ${10 - wordCount} more word${10 - wordCount === 1 ? '' : 's'} to complete`
+            : 'Ready to submit for certification'
+          }
         </p>
         
         <button
@@ -266,7 +269,7 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
                      hover:bg-deep-blue/90 transition-colors
                      disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Submit for Certification
+          {wordCount < 10 ? `Complete (${wordCount}/10 words)` : 'Complete'}
         </button>
       </div>
     </div>

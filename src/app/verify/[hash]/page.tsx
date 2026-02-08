@@ -158,7 +158,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-cream flex items-center justify-center">
+      <div className="fixed inset-0 bg-cream flex items-center justify-center">
         <div className="text-deep-blue/50">Loading verification...</div>
       </div>
     );
@@ -166,7 +166,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
 
   if (error || !document) {
     return (
-      <div className="min-h-screen bg-cream">
+      <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
         <header className="flex items-center justify-between px-8 py-6 border-b border-deep-blue/10">
           <Link href="/" className="flex items-center gap-2">
             <span className="text-xl">✍️</span>
@@ -197,7 +197,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   const scoreInfo = getScoreLabel(integrityScore);
 
   return (
-    <div className="min-h-screen bg-cream">
+    <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
       {/* Header */}
       <header className="flex items-center justify-between px-8 py-6 border-b border-deep-blue/10">
         <Link href="/" className="flex items-center gap-2">

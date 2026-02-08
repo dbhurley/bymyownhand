@@ -59,9 +59,9 @@ export default function WritePage() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-cream">
+    <div className="fixed inset-0 flex flex-col bg-cream overflow-hidden">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-deep-blue/10">
+      <header className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-deep-blue/10">
         <Link href="/" className="flex items-center gap-2">
           <span className="text-xl">✍️</span>
           <span className="font-semibold text-deep-blue">By My Own Hand</span>
@@ -78,7 +78,7 @@ export default function WritePage() {
       </header>
 
       {/* Editor */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <LockedEditor
           title={title}
           onTitleChange={setTitle}

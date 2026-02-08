@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-cream">
+    <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
       {/* Navigation */}
       <nav className="flex items-center justify-between px-8 py-6">
         <div className="flex items-center gap-2">
