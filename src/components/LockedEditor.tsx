@@ -178,33 +178,55 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
     onComplete(session);
   };
 
+  const progressPercent = Math.min(100, (wordCount / 10) * 100);
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden bg-white">
       {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-deep-blue/10 bg-cream">
-        <div className="flex items-center gap-4">
+      <div className="flex-shrink-0 flex flex-col md:flex-row md:items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-deep-blue/10 bg-gradient-to-r from-cream to-white gap-3 md:gap-0">
+        <div className="flex items-center gap-3 md:gap-4">
           <input
             type="text"
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
             placeholder="Untitled Document"
-            className="text-xl font-semibold bg-transparent border-none outline-none text-deep-blue placeholder-deep-blue/40 w-64"
+            className="text-lg md:text-xl font-semibold bg-transparent border-none outline-none text-deep-blue placeholder-deep-blue/30 w-full md:w-64 focus:placeholder-deep-blue/50 transition-colors"
           />
           {isRecording && (
-            <div className="flex items-center gap-2 text-sm text-red-600">
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse-recording" />
-              Recording
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              </span>
+              <span className="text-xs font-medium text-red-600">Recording</span>
             </div>
           )}
         </div>
         
-        <div className="flex items-center gap-6 text-sm text-deep-blue/70">
-          <span>{wordCount} words</span>
-          <span>{formatDuration(elapsedTime)}</span>
+        <div className="flex items-center gap-4 md:gap-6 text-sm">
+          <div className="flex items-center gap-2 text-deep-blue/60">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="opacity-50">
+              <path d="M8 4V8L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5"/>
+            </svg>
+            <span className="font-mono">{formatDuration(elapsedTime)}</span>
+          </div>
+          <div className="flex items-center gap-2 text-deep-blue/60">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="opacity-50">
+              <path d="M3 4H13M3 8H10M3 12H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <span className="font-medium">{wordCount} words</span>
+          </div>
           {blockedPasteCount > 0 && (
-            <span className="text-orange-600">
-              {blockedPasteCount} paste{blockedPasteCount > 1 ? 's' : ''} blocked
-            </span>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 rounded-full border border-orange-200">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-orange-500">
+                <path d="M8 6V8M8 10H8.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <path d="M3 14L8 3L13 14H3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="text-xs font-medium text-orange-600">
+                {blockedPasteCount} paste{blockedPasteCount > 1 ? 's' : ''} blocked
+              </span>
+            </div>
           )}
         </div>
       </div>
@@ -223,16 +245,17 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
             lineNumbers: 'off',
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
-            fontSize: 16,
+            fontSize: 17,
             fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
-            lineHeight: 1.8,
-            padding: { top: 24, bottom: 24 },
+            lineHeight: 1.9,
+            padding: { top: 32, bottom: 32 },
             renderWhitespace: 'none',
             overviewRulerBorder: false,
             hideCursorInOverviewRuler: true,
             scrollbar: {
               vertical: 'auto',
               horizontal: 'hidden',
+              verticalScrollbarSize: 8,
             },
             quickSuggestions: false,
             suggestOnTriggerCharacters: false,
@@ -251,26 +274,63 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
             e.stopPropagation();
           }}
         />
+
+        {/* Empty state hint */}
+        {wordCount === 0 && (
+          <div className="absolute top-32 left-0 right-0 flex justify-center pointer-events-none">
+            <div className="text-deep-blue/20 text-sm italic">Start typing to begin your session...</div>
+          </div>
+        )}
       </div>
 
       {/* Footer */}
-      <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-t border-deep-blue/10 bg-cream">
-        <p className="text-sm text-deep-blue/60">
-          {wordCount < 10 
-            ? `Write at least ${10 - wordCount} more word${10 - wordCount === 1 ? '' : 's'} to complete`
-            : 'Ready to submit for certification'
-          }
-        </p>
+      <div className="flex-shrink-0 border-t border-deep-blue/10 bg-gradient-to-r from-cream to-white">
+        {/* Progress bar */}
+        <div className="h-1 bg-deep-blue/5">
+          <div 
+            className="h-full bg-gradient-to-r from-accent to-success transition-all duration-300 ease-out"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
         
-        <button
-          onClick={handleSubmit}
-          disabled={wordCount < 10}
-          className="px-6 py-2 bg-deep-blue text-cream rounded-lg font-medium 
-                     hover:bg-deep-blue/90 transition-colors
-                     disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {wordCount < 10 ? `Complete (${wordCount}/10 words)` : 'Complete'}
-        </button>
+        <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
+          <div className="flex items-center gap-2 text-sm text-deep-blue/50">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="opacity-50">
+              <path d="M8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14Z" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M6 8L7.5 9.5L10 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span>
+              {wordCount < 10 
+                ? `${10 - wordCount} more word${10 - wordCount === 1 ? '' : 's'} needed`
+                : 'Ready to certify!'
+              }
+            </span>
+          </div>
+          
+          <button
+            onClick={handleSubmit}
+            disabled={wordCount < 10}
+            className="group flex items-center gap-2 px-5 md:px-6 py-2.5 bg-deep-blue text-cream rounded-xl font-medium 
+                       hover:bg-deep-blue/90 transition-all duration-200
+                       disabled:opacity-40 disabled:cursor-not-allowed
+                       enabled:shadow-lg enabled:shadow-deep-blue/20 enabled:hover:shadow-xl enabled:hover:shadow-deep-blue/30
+                       enabled:hover:-translate-y-0.5"
+          >
+            {wordCount < 10 ? (
+              <>
+                <span>Complete</span>
+                <span className="text-cream/60 text-sm">({wordCount}/10)</span>
+              </>
+            ) : (
+              <>
+                <span>Complete</span>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="group-hover:translate-x-0.5 transition-transform">
+                  <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
