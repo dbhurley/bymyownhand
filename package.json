@@ -12,6 +12,8 @@
     "@monaco-editor/react": "^4.7.0",
     "@neondatabase/serverless": "^1.0.2",
     "@react-pdf/renderer": "^4.3.2",
+    "gray-matter": "^4.0.3",
+    "marked": "^17.0.4",
     "nanoid": "^5.1.6",
     "next": "16.1.6",
     "qrcode": "^1.5.4",
