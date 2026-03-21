@@ -1,4 +1,4 @@
-import { getAllPosts } from "../../lib/blog";
+import { getAllPosts } from "@/lib/blog";
 import Link from "next/link";
 
 export default function DynamicBlogPosts() {

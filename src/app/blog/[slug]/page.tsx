@@ -1,4 +1,4 @@
-import { getAllPosts, getPostBySlug } from "../../lib/blog";
+import { getAllPosts, getPostBySlug } from "@/lib/blog";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
