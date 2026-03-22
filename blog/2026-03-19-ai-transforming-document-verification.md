@@ -1,1 +1,1 @@
-description: "Explore how AI technologies are reshaping document verification processes and improving efficiency across industries. This article discusses the benefits, misconceptions, and practical takeaways for organizations considering AI integration."
+Explore how AI technologies are reshaping document verification processes and improving efficiency across industries. For more insights, check out [Navigating Document Verification in a Digital Age](/blog/2026-03-18-navigating-document-verification-in-a-digital-age).
