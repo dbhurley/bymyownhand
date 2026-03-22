@@ -1,1 +1,1 @@
-Explore how AI technologies are reshaping document verification processes and improving efficiency across industries. For more insights, check out [Navigating Document Verification in a Digital Age](/blog/2026-03-18-navigating-document-verification-in-a-digital-age).
+# AI's Impact on Document Verification
