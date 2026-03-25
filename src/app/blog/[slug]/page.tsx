@@ -38,3 +38,9 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
       <div style={{ color: "#4b5563", fontSize: "0.95rem", lineHeight: 1.8 }} dangerouslySetInnerHTML={{ __html: post.content }} />
       <p style={{ marginTop: "40px" }}>
         <Link href="/blog" style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+          ← Back to blog
+        </Link>
+      </p>
+    </div>
+  );
+}
