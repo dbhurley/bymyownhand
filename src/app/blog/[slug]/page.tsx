@@ -2,6 +2,8 @@ import { getAllPosts, getPostBySlug } from "@/lib/blog";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
+export const dynamicParams = true;
+
 export async function generateStaticParams() {
   return getAllPosts().map((post) => ({ slug: post.slug }));
 }
@@ -35,8 +37,4 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
       <h1 style={{ fontSize: "clamp(1.8rem, 4vw, 2.4rem)", lineHeight: 1.1, marginBottom: "24px" }}>{post.title}</h1>
       <div style={{ color: "#4b5563", fontSize: "0.95rem", lineHeight: 1.8 }} dangerouslySetInnerHTML={{ __html: post.content }} />
       <p style={{ marginTop: "40px" }}>
-        <Link href="/blog" style={{ fontWeight: 600, fontSize: "0.9rem" }}>\u2190 Back to blog</Link>
-      </p>
-    </div>
-  );
-}
+        <Link href="/blog" style={{ fontWeight: 600, fontSize: "0.9rem" }}>
