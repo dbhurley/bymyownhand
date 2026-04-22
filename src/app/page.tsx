@@ -3,174 +3,186 @@ import Link from 'next/link';
 export default function Home() {
   return (
     <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
-      {/* Decorative background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-deep-blue/5 rounded-full blur-3xl" />
-        <div className="absolute top-1/3 -left-20 w-60 h-60 bg-accent/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-1/4 w-40 h-40 bg-deep-blue/5 rounded-full blur-2xl" />
-      </div>
-
       {/* Navigation */}
-      <nav className="relative flex items-center justify-between px-6 md:px-12 py-6">
+      <nav className="relative flex items-center justify-between max-w-3xl mx-auto px-6 py-8">
         <div className="flex items-center gap-3">
-          <img src="/logo.svg" alt="By My Own Hand" width="32" height="29" className="block" />
-          <span className="text-xl font-semibold text-deep-blue tracking-tight">By My Own Hand</span>
+          <img src="/logo.svg" alt="By My Own Hand" width="28" height="25" className="block" />
+          <span className="text-lg font-semibold text-deep-blue tracking-tight">By My Own Hand</span>
         </div>
-        <Link 
-          href="/write"
-          className="group px-5 py-2.5 text-sm font-medium text-deep-blue border-2 border-deep-blue/20 rounded-full hover:border-deep-blue hover:bg-deep-blue hover:text-cream transition-all duration-300"
-        >
-          <span className="flex items-center gap-2">
+        <div className="flex items-center gap-6">
+          <Link href="/blog" className="text-sm text-deep-blue/40 hover:text-deep-blue transition-colors hidden sm:inline">
+            Blog
+          </Link>
+          <Link
+            href="/write"
+            className="group flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-deep-blue border border-deep-blue/15 rounded-full hover:border-deep-blue hover:bg-deep-blue hover:text-cream transition-all duration-300"
+          >
             Start Writing
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="group-hover:translate-x-1 transition-transform">
-              <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="group-hover:translate-x-0.5 transition-transform">
+              <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-          </span>
-        </Link>
+          </Link>
+        </div>
       </nav>
 
       {/* Hero */}
-      <main className="relative max-w-5xl mx-auto px-6 md:px-12 pt-16 md:pt-24 pb-32">
-        {/* Badge */}
-        <div className="flex justify-center mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-deep-blue/5 rounded-full border border-deep-blue/10">
-            <span className="w-2 h-2 bg-success rounded-full animate-pulse" />
-            <span className="text-sm text-deep-blue/70">Anti-AI writing verification</span>
-          </div>
+      <section className="relative min-h-[75vh] flex flex-col items-center justify-center px-6">
+        {/* Watermark */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
+          <img src="/logo.svg" alt="" className="w-[420px] md:w-[540px] opacity-[0.025]" />
         </div>
 
-        <div className="text-center mb-16">
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-deep-blue mb-6 leading-[1.1] tracking-tight">
-            Prove it&apos;s yours.
+        <div className="relative text-center max-w-2xl mx-auto">
+          <img src="/logo.svg" alt="" width="56" height="50" className="block mx-auto mb-10" />
+
+          <h1 className="text-4xl md:text-[3.5rem] lg:text-6xl font-bold text-deep-blue mb-6 leading-[1.08] tracking-tight">
+            Your words
             <br />
-            <span className="relative">
-              <span className="text-accent">Write it yourself.</span>
-              <svg className="absolute -bottom-2 left-0 w-full" height="8" viewBox="0 0 200 8" fill="none" preserveAspectRatio="none">
-                <path d="M1 5.5C47 2.5 153 2.5 199 5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-accent/30"/>
-              </svg>
-            </span>
+            deserve proof.
           </h1>
-          <p className="text-lg md:text-xl text-deep-blue/60 max-w-2xl mx-auto mb-10 leading-relaxed">
-            In a world of AI-generated content, authenticity matters. 
-            Certify your writing was created by your own hands, keystroke by keystroke.
+
+          <p className="text-lg md:text-xl text-deep-blue/50 max-w-lg mx-auto mb-12 leading-relaxed">
+            Certify your writing was created by your own hands &mdash;
+            keystroke by keystroke. Every pause, every correction,
+            every word. Unmistakably human.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link 
-              href="/write"
-              className="group inline-flex items-center gap-3 px-8 py-4 bg-deep-blue text-cream text-lg font-medium rounded-2xl hover:bg-deep-blue/90 transition-all duration-300 shadow-lg shadow-deep-blue/20 hover:shadow-xl hover:shadow-deep-blue/30 hover:-translate-y-0.5"
-            >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M4 16L16 4M16 4H8M16 4V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Start Writing
-            </Link>
-            <a 
-              href="#how-it-works"
-              className="inline-flex items-center gap-2 px-6 py-4 text-deep-blue/70 hover:text-deep-blue font-medium transition-colors"
-            >
-              <span>See how it works</span>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M8 3V13M8 13L4 9M8 13L12 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </a>
-          </div>
-        </div>
 
-        {/* How it works */}
-        <div id="how-it-works" className="scroll-mt-20">
-          <div className="text-center mb-12">
-            <h2 className="text-sm font-semibold text-deep-blue/40 uppercase tracking-widest mb-3">How it works</h2>
-            <p className="text-2xl md:text-3xl font-semibold text-deep-blue">Three simple steps to certification</p>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-6 mb-24">
-            <div className="group relative bg-white/80 backdrop-blur-sm p-8 rounded-3xl border border-deep-blue/10 hover:border-deep-blue/20 transition-all duration-300 hover:shadow-xl hover:shadow-deep-blue/5 hover:-translate-y-1">
-              <div className="absolute top-6 right-6 text-6xl font-bold text-deep-blue/5">1</div>
-              <div className="w-14 h-14 bg-gradient-to-br from-deep-blue to-deep-blue/80 rounded-2xl flex items-center justify-center text-cream text-2xl mb-6 shadow-lg shadow-deep-blue/20">
-                ⌨️
-              </div>
-              <h3 className="text-xl font-semibold text-deep-blue mb-3">Write Naturally</h3>
-              <p className="text-deep-blue/60 leading-relaxed">
-                Use our locked-down editor. No pasting from external sources. 
-                Every keystroke is recorded with timing data.
-              </p>
-            </div>
-            
-            <div className="group relative bg-white/80 backdrop-blur-sm p-8 rounded-3xl border border-deep-blue/10 hover:border-deep-blue/20 transition-all duration-300 hover:shadow-xl hover:shadow-deep-blue/5 hover:-translate-y-1">
-              <div className="absolute top-6 right-6 text-6xl font-bold text-deep-blue/5">2</div>
-              <div className="w-14 h-14 bg-gradient-to-br from-accent to-accent/80 rounded-2xl flex items-center justify-center text-white text-2xl mb-6 shadow-lg shadow-accent/20">
-                📊
-              </div>
-              <h3 className="text-xl font-semibold text-deep-blue mb-3">Get Certified</h3>
-              <p className="text-deep-blue/60 leading-relaxed">
-                Submit your work and receive a verification hash. 
-                We analyze your writing patterns to calculate an authenticity score.
-              </p>
-            </div>
-            
-            <div className="group relative bg-white/80 backdrop-blur-sm p-8 rounded-3xl border border-deep-blue/10 hover:border-deep-blue/20 transition-all duration-300 hover:shadow-xl hover:shadow-deep-blue/5 hover:-translate-y-1">
-              <div className="absolute top-6 right-6 text-6xl font-bold text-deep-blue/5">3</div>
-              <div className="w-14 h-14 bg-gradient-to-br from-success to-success/80 rounded-2xl flex items-center justify-center text-white text-2xl mb-6 shadow-lg shadow-success/20">
-                ✅
-              </div>
-              <h3 className="text-xl font-semibold text-deep-blue mb-3">Share Proof</h3>
-              <p className="text-deep-blue/60 leading-relaxed">
-                Get a shareable verification link and downloadable certificate. 
-                Anyone can verify your writing is authentically human.
-              </p>
-            </div>
-          </div>
-
-          {/* Trust indicators */}
-          <div className="bg-deep-blue rounded-3xl p-8 md:p-12 text-cream">
-            <div className="text-center mb-8">
-              <h3 className="text-sm font-semibold text-cream/50 uppercase tracking-widest mb-3">Detection capabilities</h3>
-              <p className="text-2xl font-semibold">What we analyze to verify authenticity</p>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {[
-                { icon: '⚡', label: 'Typing Speed', desc: 'Natural WPM patterns' },
-                { icon: '📋', label: 'Paste Attempts', desc: 'Blocked & logged' },
-                { icon: '⏸️', label: 'Natural Pauses', desc: 'Thinking patterns' },
-                { icon: '⌫', label: 'Edit Patterns', desc: 'Revision behavior' },
-                { icon: '🎯', label: 'Keystroke Rhythm', desc: 'Timing variance' },
-              ].map((item, i) => (
-                <div key={i} className="text-center p-4 rounded-2xl bg-cream/5 hover:bg-cream/10 transition-colors">
-                  <span className="text-3xl mb-2 block">{item.icon}</span>
-                  <span className="font-medium block mb-1">{item.label}</span>
-                  <span className="text-xs text-cream/50">{item.desc}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <Link
+            href="/write"
+            className="group inline-flex items-center gap-3 px-8 py-4 bg-deep-blue text-cream text-lg font-medium rounded-full hover:bg-deep-blue/90 transition-all duration-300 shadow-lg shadow-deep-blue/10 hover:shadow-xl hover:shadow-deep-blue/20 hover:-translate-y-0.5"
+          >
+            Begin Writing
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="group-hover:translate-x-0.5 transition-transform">
+              <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
         </div>
+      </section>
 
-        {/* CTA Section */}
-        <div className="mt-24 text-center">
-          <div className="inline-block bg-gradient-to-br from-white to-cream/50 p-12 rounded-3xl border border-deep-blue/10 shadow-2xl shadow-deep-blue/5">
-            <h2 className="text-3xl md:text-4xl font-bold text-deep-blue mb-4">Ready to prove it&apos;s yours?</h2>
-            <p className="text-deep-blue/60 mb-8 max-w-md mx-auto">Start writing now and get your authenticity certificate in minutes.</p>
-            <Link 
-              href="/write"
-              className="inline-flex items-center gap-3 px-10 py-4 bg-deep-blue text-cream text-lg font-medium rounded-2xl hover:bg-deep-blue/90 transition-all duration-300 shadow-lg shadow-deep-blue/20"
-            >
-              Start Your Certification
-              <span className="text-xl">→</span>
-            </Link>
-          </div>
+      {/* Ornamental divider */}
+      <Divider />
+
+      {/* How It Works */}
+      <section id="how-it-works" className="scroll-mt-20 max-w-3xl mx-auto px-6 py-20 md:py-24">
+        <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-16 text-center">
+          How it works
+        </p>
+
+        <div className="space-y-14 md:space-y-16">
+          {[
+            {
+              num: '01',
+              title: 'Write Naturally',
+              desc: 'Use our locked-down editor. No pasting from external sources, no AI assistance. Every keystroke is captured with precise timing data.',
+            },
+            {
+              num: '02',
+              title: 'Get Certified',
+              desc: 'Submit your work and receive a unique verification hash. We analyze your writing patterns \u2014 speed, rhythm, pauses, corrections \u2014 to calculate an authenticity score.',
+            },
+            {
+              num: '03',
+              title: 'Share Proof',
+              desc: 'Get a shareable verification link and a downloadable certificate. Anyone can verify your writing is authentically human, anytime.',
+            },
+          ].map((step, i) => (
+            <div key={step.num} className="flex gap-6 md:gap-10 items-start">
+              <div className="flex flex-col items-center flex-shrink-0">
+                <span className="text-4xl md:text-5xl font-bold text-deep-blue/[0.07] leading-none tabular-nums select-none">
+                  {step.num}
+                </span>
+                {i < 2 && (
+                  <div className="w-px h-10 md:h-14 bg-deep-blue/[0.06] mt-4 hidden md:block" />
+                )}
+              </div>
+              <div className="pt-1 md:pt-2">
+                <h3 className="text-xl md:text-2xl font-semibold text-deep-blue mb-2 tracking-tight">
+                  {step.title}
+                </h3>
+                <p className="text-deep-blue/50 leading-relaxed max-w-lg">
+                  {step.desc}
+                </p>
+              </div>
+            </div>
+          ))}
         </div>
-      </main>
+      </section>
+
+      {/* Ornamental divider */}
+      <Divider />
+
+      {/* What We Analyze */}
+      <section className="max-w-3xl mx-auto px-6 py-20 md:py-24">
+        <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-14 text-center">
+          What we analyze
+        </p>
+
+        <div className="space-y-6">
+          {[
+            { label: 'Typing Speed', desc: 'Natural words-per-minute patterns that distinguish human rhythm from machine output' },
+            { label: 'Paste Attempts', desc: 'Every external paste is blocked and logged \u2014 your words must originate in the editor' },
+            { label: 'Natural Pauses', desc: 'The thinking gaps between sentences that reveal a mind composing in real time' },
+            { label: 'Edit Patterns', desc: 'Backspaces, rewrites, and revisions \u2014 the unmistakable trail of human deliberation' },
+            { label: 'Keystroke Rhythm', desc: 'Timing variance between keystrokes that no algorithm can convincingly replicate' },
+          ].map((item, i) => (
+            <div key={i} className="flex gap-4 items-baseline">
+              <span className="w-1.5 h-1.5 rounded-full bg-deep-blue/15 flex-shrink-0 mt-[0.6rem]" />
+              <div>
+                <span className="font-semibold text-deep-blue">{item.label}</span>
+                <span className="text-deep-blue/35 mx-2">&mdash;</span>
+                <span className="text-deep-blue/50">{item.desc}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Ornamental divider */}
+      <Divider />
+
+      {/* CTA */}
+      <section className="max-w-3xl mx-auto px-6 py-24 md:py-32 text-center">
+        <h2 className="text-3xl md:text-4xl font-bold text-deep-blue mb-4 tracking-tight">
+          Ready to prove it&apos;s yours?
+        </h2>
+        <p className="text-deep-blue/50 mb-10 max-w-md mx-auto leading-relaxed">
+          Start writing now and get your authenticity certificate in minutes.
+        </p>
+        <Link
+          href="/write"
+          className="group inline-flex items-center gap-3 px-10 py-4 bg-deep-blue text-cream text-lg font-medium rounded-full hover:bg-deep-blue/90 transition-all duration-300 shadow-lg shadow-deep-blue/10"
+        >
+          Start Your Certification
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="group-hover:translate-x-0.5 transition-transform">
+            <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </Link>
+      </section>
 
       {/* Footer */}
-      <footer className="relative border-t border-deep-blue/10 py-8 bg-white/50 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-deep-blue/50">
-          <div className="flex items-center gap-2">
-            <img src="/logo.svg" alt="" width="20" height="18" className="block opacity-30" />
-            <span>© 2025 By My Own Hand</span>
+      <footer className="border-t border-deep-blue/[0.06] py-8">
+        <div className="max-w-3xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-deep-blue/35">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <img src="/logo.svg" alt="" width="16" height="14" className="block opacity-25" />
+              <span>&copy; 2025 By My Own Hand</span>
+            </div>
+            <span className="hidden md:inline text-deep-blue/15">|</span>
+            <Link href="/blog" className="hover:text-deep-blue/60 transition-colors hidden md:inline">Blog</Link>
           </div>
-          <p className="italic">Prove you&apos;re human, one keystroke at a time.</p>
+          <p>Prove you&apos;re human, one keystroke at a time.</p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function Divider() {
+  return (
+    <div className="flex items-center justify-center gap-3 max-w-3xl mx-auto px-6">
+      <div className="w-12 h-px bg-deep-blue/[0.08]" />
+      <div className="w-1.5 h-1.5 rounded-full bg-deep-blue/[0.08]" />
+      <div className="w-12 h-px bg-deep-blue/[0.08]" />
     </div>
   );
 }
