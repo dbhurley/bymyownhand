@@ -66,10 +66,7 @@ export default function WritePage() {
       {/* Header */}
       <header className="flex-shrink-0 flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-deep-blue/10 bg-cream/80 backdrop-blur-sm">
         <Link href="/" className="flex items-center gap-2 md:gap-3 hover:opacity-70 transition-opacity">
-          <svg width="24" height="24" viewBox="0 0 32 32" fill="none" className="text-deep-blue">
-            <path d="M8 28L16 4L24 28" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M10 20H22" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
+          <img src="/logo.svg" alt="By My Own Hand" width="24" height="21" className="block" />
           <span className="font-semibold text-deep-blue hidden sm:inline">By My Own Hand</span>
         </Link>
         

@@ -13,13 +13,7 @@ export default function Home() {
       {/* Navigation */}
       <nav className="relative flex items-center justify-between px-6 md:px-12 py-6">
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="text-deep-blue">
-              <path d="M8 28L16 4L24 28" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M10 20H22" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M16 4C16 4 18 8 18 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
-            </svg>
-          </div>
+          <img src="/logo.svg" alt="By My Own Hand" width="32" height="29" className="block" />
           <span className="text-xl font-semibold text-deep-blue tracking-tight">By My Own Hand</span>
         </div>
         <Link 
@@ -171,10 +165,7 @@ export default function Home() {
       <footer className="relative border-t border-deep-blue/10 py-8 bg-white/50 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-deep-blue/50">
           <div className="flex items-center gap-2">
-            <svg width="20" height="20" viewBox="0 0 32 32" fill="none" className="text-deep-blue/30">
-              <path d="M8 28L16 4L24 28" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M10 20H22" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
+            <img src="/logo.svg" alt="" width="20" height="18" className="block opacity-30" />
             <span>© 2025 By My Own Hand</span>
           </div>
           <p className="italic">Prove you&apos;re human, one keystroke at a time.</p>

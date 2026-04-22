@@ -169,7 +169,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
       <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
         <header className="flex items-center justify-between px-8 py-6 border-b border-deep-blue/10">
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl">✍️</span>
+            <img src="/logo.svg" alt="By My Own Hand" width="24" height="21" className="block" />
             <span className="font-semibold text-deep-blue">By My Own Hand</span>
           </Link>
         </header>
@@ -201,7 +201,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
       {/* Header */}
       <header className="flex items-center justify-between px-8 py-6 border-b border-deep-blue/10">
         <Link href="/" className="flex items-center gap-2">
-          <span className="text-xl">✍️</span>
+          <img src="/logo.svg" alt="By My Own Hand" width="24" height="21" className="block" />
           <span className="font-semibold text-deep-blue">By My Own Hand</span>
         </Link>
         <span className="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full">

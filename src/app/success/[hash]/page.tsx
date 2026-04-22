@@ -60,10 +60,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
       {/* Header */}
       <header className="relative flex items-center justify-between px-6 md:px-8 py-6 border-b border-deep-blue/10 bg-white/50 backdrop-blur-sm">
         <Link href="/" className="flex items-center gap-3 hover:opacity-70 transition-opacity">
-          <svg width="24" height="24" viewBox="0 0 32 32" fill="none" className="text-deep-blue">
-            <path d="M8 28L16 4L24 28" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M10 20H22" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
+          <img src="/logo.svg" alt="By My Own Hand" width="24" height="21" className="block" />
           <span className="font-semibold text-deep-blue">By My Own Hand</span>
         </Link>
       </header>
