@@ -11,17 +11,67 @@ export interface BlogPost {
   tags: string[];
   content: string;
   readTime: string;
+  author?: string;
+}
+
+export interface BlogCategory {
+  name: string;
+  slug: string;
+  color: string;
+  keywords: string[];
+  posts: BlogPost[];
+}
+
+export interface TagCount {
+  tag: string;
+  count: number;
 }
 
 const BLOG_DIR = path.join(process.cwd(), 'blog');
 
-function stripFrontmatter(raw: string): { body: string; title: string; date: string; excerpt: string; tags: string[] } {
+const CATEGORY_MAP = [
+  {
+    name: 'Identity & Authentication',
+    slug: 'identity',
+    color: 'blue',
+    keywords: ['identity', 'authentication', 'biometric', 'passkey', 'identity verification'],
+  },
+  {
+    name: 'AI & Human Oversight',
+    slug: 'ai',
+    color: 'amber',
+    keywords: ['ai', 'human oversight', 'human judgment', 'human touch', 'ai ethics', 'constitutional', 'reasoning', 'ai security'],
+  },
+  {
+    name: 'Security & Compliance',
+    slug: 'security',
+    color: 'rose',
+    keywords: ['cyber', 'security', 'compliance', 'regulation', 'supply chain', 'fraud', 'attack', 'oauth'],
+  },
+  {
+    name: 'Technology & Innovation',
+    slug: 'technology',
+    color: 'emerald',
+    keywords: ['blockchain', 'api', 'digital transformation', 'standards', 'technology', 'git'],
+  },
+  {
+    name: 'Strategy & Industry',
+    slug: 'strategy',
+    color: 'violet',
+    keywords: ['business', 'competitive', 'strategy', 'trends', 'skills gap', 'remote work', 'imperative'],
+  },
+];
+
+const FILTERED_TAGS = new Set(['bymyownhand', 'next.js']);
+
+function stripFrontmatter(raw: string): { body: string; title: string; date: string; excerpt: string; tags: string[]; author: string } {
   let body = raw;
   let title = '';
   let date = '';
   let excerpt = '';
   let tags: string[] = [];
-  
+  let author = '';
+
   if (raw.startsWith('---')) {
     const end = raw.indexOf('\n---', 3);
     if (end !== -1) {
@@ -31,13 +81,15 @@ function stripFrontmatter(raw: string): { body: string; title: string; date: str
       const dateMatch = fm.match(/^date:\s*"?([^"\n]+)"?/m);
       const excerptMatch = fm.match(/^excerpt:\s*"?([^"\n]+)"?/m);
       const tagsMatch = fm.match(/^tags:\s*\[([^\]]+)\]/m);
+      const authorMatch = fm.match(/^author:\s*"?([^"\n]+)"?/m);
       if (titleMatch) title = titleMatch[1].trim();
       if (dateMatch) date = dateMatch[1].trim();
       if (excerptMatch) excerpt = excerptMatch[1].trim();
       if (tagsMatch) tags = tagsMatch[1].split(',').map(t => t.trim().replace(/^"|"$/g, ''));
+      if (authorMatch) author = authorMatch[1].trim();
     }
   }
-  return { body, title, date, excerpt, tags };
+  return { body, title, date, excerpt, tags, author };
 }
 
 function parsePost(filename: string): BlogPost | null {
@@ -53,7 +105,7 @@ function parsePost(filename: string): BlogPost | null {
     } catch {
       const fallback = stripFrontmatter(raw);
       body = fallback.body;
-      data = { title: fallback.title, date: fallback.date, excerpt: fallback.excerpt, tags: fallback.tags };
+      data = { title: fallback.title, date: fallback.date, excerpt: fallback.excerpt, tags: fallback.tags, author: fallback.author };
     }
 
     const firstLine = body.split('\n')[0];
@@ -74,6 +126,7 @@ function parsePost(filename: string): BlogPost | null {
       tags: Array.isArray(data['tags']) ? data['tags'].map(String) : [],
       content: html,
       readTime: `${Math.max(1, Math.ceil(wordCount / 250))} min read`,
+      author: String(data['author'] || ''),
     };
   } catch {
     return null;
@@ -82,7 +135,7 @@ function parsePost(filename: string): BlogPost | null {
 
 export function getAllPosts(): BlogPost[] {
   if (!fs.existsSync(BLOG_DIR)) return [];
-  const files = fs.readdirSync(BLOG_DIR).filter(f => f.endsWith('.md'));
+  const files = fs.readdirSync(BLOG_DIR).filter(f => f.endsWith('.md') && f !== 'README.md');
   const posts = files.map(parsePost).filter((p): p is BlogPost => p !== null);
   posts.sort((a, b) => b.date.localeCompare(a.date));
   return posts;
@@ -90,4 +143,58 @@ export function getAllPosts(): BlogPost[] {
 
 export function getPostBySlug(slug: string): BlogPost | null {
   return getAllPosts().find(p => p.slug === slug) || null;
+}
+
+export function getFeaturedPost(): BlogPost | null {
+  const posts = getAllPosts();
+  return posts[0] || null;
+}
+
+export function getRelatedPosts(currentSlug: string, tags: string[], limit: number = 3): BlogPost[] {
+  const posts = getAllPosts().filter(p => p.slug !== currentSlug);
+  const currentTagsLower = tags.map(t => t.toLowerCase());
+
+  const scored = posts.map(post => {
+    const postTagsLower = post.tags.map(t => t.toLowerCase());
+    let score = 0;
+    for (const ct of currentTagsLower) {
+      for (const pt of postTagsLower) {
+        if (ct === pt) score += 3;
+        else if (ct.includes(pt) || pt.includes(ct)) score += 1;
+      }
+    }
+    return { post, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score || b.post.date.localeCompare(a.post.date));
+  return scored.slice(0, limit).map(s => s.post);
+}
+
+export function getCategories(): BlogCategory[] {
+  const posts = getAllPosts();
+
+  return CATEGORY_MAP.map(cat => {
+    const catPosts = posts.filter(post => {
+      const joined = post.tags.map(t => t.toLowerCase()).join(' ') + ' ' + post.title.toLowerCase();
+      return cat.keywords.some(kw => joined.includes(kw));
+    });
+    return { ...cat, posts: catPosts };
+  }).filter(cat => cat.posts.length > 0);
+}
+
+export function getAllTags(): TagCount[] {
+  const posts = getAllPosts();
+  const tagMap = new Map<string, number>();
+
+  for (const post of posts) {
+    for (const tag of post.tags) {
+      if (!FILTERED_TAGS.has(tag.toLowerCase())) {
+        tagMap.set(tag, (tagMap.get(tag) || 0) + 1);
+      }
+    }
+  }
+
+  return Array.from(tagMap.entries())
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count);
 }

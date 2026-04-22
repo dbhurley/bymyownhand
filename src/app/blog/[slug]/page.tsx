@@ -1,40 +1,174 @@
-import { getAllPosts, getPostBySlug } from "@/lib/blog";
-import { notFound } from "next/navigation";
-import Link from "next/link";
+import { getAllPosts, getPostBySlug, getRelatedPosts } from '@/lib/blog';
+import { notFound } from 'next/navigation';
+import Link from 'next/link';
+import type { Metadata } from 'next';
 
 export const dynamicParams = true;
 
 export async function generateStaticParams() {
-  return getAllPosts().map((post) => ({ slug: post.slug }));
+  return getAllPosts().map(post => ({ slug: post.slug }));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const post = getPostBySlug(slug);
-  if (!post) return { title: "Post not found" };
-  return { title: post.title + " - Blog", description: post.excerpt };
+  if (!post) return { title: 'Post not found' };
+
+  return {
+    title: `${post.title} | By My Own Hand Blog`,
+    description: post.excerpt,
+    openGraph: {
+      title: post.title,
+      description: post.excerpt,
+      type: 'article',
+      publishedTime: post.date,
+      authors: ['By My Own Hand'],
+      tags: post.tags,
+    },
+  };
 }
 
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const post = getPostBySlug(slug);
   if (!post) notFound();
+
+  const related = getRelatedPosts(slug, post.tags, 3);
+  const filteredTags = post.tags.filter(t => !['ByMyOwnHand', 'Next.js'].includes(t));
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.title,
+    datePublished: post.date,
+    description: post.excerpt,
+    keywords: post.tags.join(', '),
+    author: { '@type': 'Organization', name: 'By My Own Hand' },
+    publisher: {
+      '@type': 'Organization',
+      name: 'By My Own Hand',
+      logo: { '@type': 'ImageObject', url: '/logo.svg' },
+    },
+  };
+
   return (
     <>
-      <main style={{ maxWidth: "660px", margin: "0 auto", padding: "0 24px 64px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", fontSize: "0.82rem", color: "#6b7280", flexWrap: "wrap" as const }}>
-          {post.tags.slice(0, 3).map((tag) => (
-            <span key={tag} style={{ padding: "2px 8px", borderRadius: "6px", background: "#2563eb18", color: "#2563eb", fontWeight: 600, fontSize: "0.72rem", textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>{tag}</span>
-          ))}
-          <span>{post.date}</span>
-          <span>{post.readTime}</span>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
+      {/* ── Post Header ── */}
+      <header className="blog-hero px-6 md:px-12 pt-12 pb-16 md:pt-16 md:pb-20">
+        <div className="max-w-3xl mx-auto">
+          <nav className="flex items-center gap-2 text-sm text-cream/40 mb-8 animate-fade-in-up">
+            <Link href="/blog" className="hover:text-cream/70 transition-colors">Blog</Link>
+            <span>/</span>
+            <span className="text-cream/60 truncate max-w-[300px]">{post.title}</span>
+          </nav>
+
+          <div className="flex flex-wrap gap-2 mb-4 animate-fade-in-up animate-delay-100">
+            {filteredTags.slice(0, 4).map(tag => (
+              <span key={tag} className="blog-tag blog-tag-light">{tag}</span>
+            ))}
+          </div>
+
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-cream mb-6 leading-[1.15] tracking-tight animate-fade-in-up animate-delay-200">
+            {post.title}
+          </h1>
+
+          <div className="flex items-center gap-4 animate-fade-in-up animate-delay-300">
+            <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
+              <img src="/logo.svg" alt="" width="20" height="18" style={{ filter: 'brightness(0) invert(1)' }} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-cream/80">By My Own Hand</p>
+              <div className="flex items-center gap-3 text-sm text-cream/40">
+                <time dateTime={post.date}>{formatDate(post.date)}</time>
+                <span className="w-1 h-1 bg-cream/20 rounded-full" />
+                <span>{post.readTime}</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <h1 style={{ fontSize: "clamp(1.8rem, 4vw, 2.4rem)", lineHeight: 1.15, marginBottom: "28px" }}>{post.title}</h1>
-        <article style={{ fontSize: "1.05rem", lineHeight: 1.8 }} dangerouslySetInnerHTML={{ __html: post.content }} />
-        <p style={{ marginTop: "40px" }}>
-          <Link href="/blog" style={{ color: "#2563eb", fontWeight: 600, textDecoration: "none" }}>{"← Back to blog"}</Link>
-        </p>
-      </main>
+      </header>
+
+      {/* ── Article Body ── */}
+      <div className="px-6 md:px-12 py-12 md:py-16">
+        <article
+          className="blog-prose max-w-3xl mx-auto"
+          dangerouslySetInnerHTML={{ __html: post.content }}
+        />
+      </div>
+
+      {/* ── CTA ── */}
+      <section className="px-6 md:px-12 pb-12">
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-gradient-to-br from-deep-blue to-deep-blue/90 rounded-2xl p-8 md:p-12 text-center text-cream">
+            <h2 className="text-2xl md:text-3xl font-bold mb-3">Ready to prove your words?</h2>
+            <p className="text-cream/60 max-w-md mx-auto mb-6">
+              Certify your writing as authentically human. No AI. No shortcuts. Just your own hand.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link
+                href="/write"
+                className="inline-flex items-center gap-2 px-8 py-3 bg-cream text-deep-blue font-semibold rounded-full hover:bg-white transition-colors"
+              >
+                Start Writing
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+                  <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </Link>
+              <Link
+                href="/blog"
+                className="inline-flex items-center gap-2 px-6 py-3 text-cream/70 hover:text-cream font-medium transition-colors"
+              >
+                More Articles
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Related Posts ── */}
+      {related.length > 0 && (
+        <section className="px-6 md:px-12 pb-16">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-center gap-4 mb-8">
+              <h2 className="text-xl font-bold text-deep-blue">Related Articles</h2>
+              <div className="flex-1 h-px bg-gradient-to-r from-deep-blue/10 to-transparent" />
+            </div>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {related.map(rp => (
+                <Link key={rp.slug} href={`/blog/${rp.slug}`} className="blog-card group">
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {rp.tags.filter(t => !['ByMyOwnHand', 'Next.js'].includes(t)).slice(0, 2).map(tag => (
+                      <span key={tag} className="blog-tag blog-tag-blue">{tag}</span>
+                    ))}
+                    <span className="text-xs text-deep-blue/30">{rp.date}</span>
+                  </div>
+                  <h3 className="font-semibold text-deep-blue group-hover:text-accent transition-colors leading-snug mb-2">
+                    {rp.title}
+                  </h3>
+                  <p className="text-sm text-deep-blue/50 line-clamp-2">{rp.excerpt}</p>
+                </Link>
+              ))}
+            </div>
+
+            <div className="text-center mt-8">
+              <Link href="/blog" className="text-sm font-medium text-accent hover:text-deep-blue transition-colors">
+                &larr; Back to all posts
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
     </>
   );
+}
+
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr + 'T00:00:00');
+  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
