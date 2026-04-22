@@ -12,8 +12,8 @@ const LockedEditor = dynamic(() => import('@/components/LockedEditor'), {
   loading: () => (
     <div className="flex items-center justify-center h-full bg-cream">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 border-4 border-deep-blue/20 border-t-deep-blue rounded-full animate-spin" />
-        <span className="text-deep-blue/50 font-medium">Preparing your writing environment...</span>
+        <div className="w-10 h-10 border-2 border-deep-blue/15 border-t-deep-blue/60 rounded-full animate-spin" />
+        <span className="text-deep-blue/40 text-sm">Preparing your writing environment...</span>
       </div>
     </div>
   ),
@@ -64,26 +64,23 @@ export default function WritePage() {
   return (
     <div className="fixed inset-0 flex flex-col bg-cream overflow-hidden">
       {/* Header */}
-      <header className="flex-shrink-0 flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-deep-blue/10 bg-cream/80 backdrop-blur-sm">
-        <Link href="/" className="flex items-center gap-2 md:gap-3 hover:opacity-70 transition-opacity">
-          <img src="/logo.svg" alt="By My Own Hand" width="24" height="21" className="block" />
-          <span className="font-semibold text-deep-blue hidden sm:inline">By My Own Hand</span>
+      <header className="flex-shrink-0 flex items-center justify-between px-5 md:px-8 py-3 md:py-4 border-b border-deep-blue/[0.06]">
+        <Link href="/" className="flex items-center gap-2.5 hover:opacity-70 transition-opacity">
+          <img src="/logo.svg" alt="By My Own Hand" width="22" height="20" className="block" />
+          <span className="font-semibold text-deep-blue text-sm hidden sm:inline">By My Own Hand</span>
         </Link>
-        
+
         <div className="flex items-center gap-4">
           {error && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-red-500">
-                <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M8 4V9M8 11V12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <span className="text-sm text-red-600">{error}</span>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-100 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+              <span className="text-xs text-red-600">{error}</span>
             </div>
           )}
           {isSubmitting && (
-            <div className="flex items-center gap-2 px-4 py-2 bg-deep-blue/5 rounded-lg">
-              <div className="w-4 h-4 border-2 border-deep-blue/30 border-t-deep-blue rounded-full animate-spin" />
-              <span className="text-sm text-deep-blue/70">Certifying your work...</span>
+            <div className="flex items-center gap-2">
+              <div className="w-3.5 h-3.5 border-2 border-deep-blue/20 border-t-deep-blue/60 rounded-full animate-spin" />
+              <span className="text-xs text-deep-blue/50">Certifying...</span>
             </div>
           )}
         </div>

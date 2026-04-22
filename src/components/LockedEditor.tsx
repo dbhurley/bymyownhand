@@ -20,7 +20,7 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
   const [elapsedTime, setElapsedTime] = useState(0);
   const [blockedPasteCount, setBlockedPasteCount] = useState(0);
   const [isRecording, setIsRecording] = useState(true);
-  
+
   const eventsRef = useRef<KeystrokeEvent[]>([]);
   const internalClipboard = useRef<string>('');
   const editorRef = useRef<any>(null);
@@ -47,14 +47,14 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
 
   const handleEditorMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
-    
+
     // Block external paste - intercept clipboard
     editor.onKeyDown((e) => {
       // Handle paste attempt (Cmd+V / Ctrl+V)
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyV') {
         e.preventDefault();
         e.stopPropagation();
-        
+
         // Check if we have internal clipboard content
         if (internalClipboard.current) {
           // Allow internal paste
@@ -80,7 +80,7 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
         }
         return;
       }
-      
+
       // Handle copy (Cmd+C / Ctrl+C) - store in internal clipboard
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyC') {
         const selection = editor.getSelection();
@@ -91,7 +91,7 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
         // Allow default copy behavior for accessibility
         return;
       }
-      
+
       // Handle cut (Cmd+X / Ctrl+X)
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyX') {
         const selection = editor.getSelection();
@@ -107,12 +107,12 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
     // Record keystrokes
     editor.onKeyUp((e) => {
       const pos = editor.getPosition()?.column || 0;
-      
+
       // Skip modifier keys
       if (['Meta', 'Control', 'Alt', 'Shift', 'CapsLock'].includes(e.code)) {
         return;
       }
-      
+
       // Check if it's a deletion
       if (e.code === 'Backspace' || e.code === 'Delete') {
         recordEvent({
@@ -122,10 +122,10 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
         });
         return;
       }
-      
+
       // Record regular keystroke
-      if (e.code.startsWith('Key') || e.code.startsWith('Digit') || 
-          e.code === 'Space' || e.code === 'Enter' || 
+      if (e.code.startsWith('Key') || e.code.startsWith('Digit') ||
+          e.code === 'Space' || e.code === 'Enter' ||
           e.code.startsWith('Bracket') || e.code.startsWith('Quote') ||
           e.code === 'Comma' || e.code === 'Period' || e.code === 'Semicolon') {
         recordEvent({
@@ -160,10 +160,10 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
 
   const handleSubmit = () => {
     setIsRecording(false);
-    
+
     const metrics = calculateMetrics(eventsRef.current);
     const integrityScore = calculateIntegrityScore(metrics, wordCount, elapsedTime);
-    
+
     const session: WritingSession = {
       id: sessionId,
       startedAt: startTime,
@@ -174,7 +174,7 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
       wordCount,
       integrityScore,
     };
-    
+
     onComplete(session);
   };
 
@@ -182,51 +182,35 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white">
-      {/* Header */}
-      <div className="flex-shrink-0 flex flex-col md:flex-row md:items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-deep-blue/10 bg-gradient-to-r from-cream to-white gap-3 md:gap-0">
-        <div className="flex items-center gap-3 md:gap-4">
+      {/* Toolbar */}
+      <div className="flex-shrink-0 flex flex-col md:flex-row md:items-center justify-between px-5 md:px-8 py-3 md:py-4 border-b border-deep-blue/[0.06] bg-cream gap-3 md:gap-0">
+        <div className="flex items-center gap-4">
           <input
             type="text"
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
             placeholder="Untitled Document"
-            className="text-lg md:text-xl font-semibold bg-transparent border-none outline-none text-deep-blue placeholder-deep-blue/30 w-full md:w-64 focus:placeholder-deep-blue/50 transition-colors"
+            className="text-lg font-semibold bg-transparent border-none outline-none text-deep-blue placeholder-deep-blue/25 w-full md:w-72 focus:placeholder-deep-blue/40 transition-colors"
           />
           {isRecording && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-              </span>
-              <span className="text-xs font-medium text-red-600">Recording</span>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="w-2 h-2 rounded-full bg-deep-blue/40 animate-pulse-recording" />
+              <span className="text-xs font-medium text-deep-blue/35 uppercase tracking-wider">Recording</span>
             </div>
           )}
         </div>
-        
-        <div className="flex items-center gap-4 md:gap-6 text-sm">
-          <div className="flex items-center gap-2 text-deep-blue/60">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="opacity-50">
-              <path d="M8 4V8L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5"/>
-            </svg>
-            <span className="font-mono">{formatDuration(elapsedTime)}</span>
-          </div>
-          <div className="flex items-center gap-2 text-deep-blue/60">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="opacity-50">
-              <path d="M3 4H13M3 8H10M3 12H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            <span className="font-medium">{wordCount} words</span>
-          </div>
+
+        <div className="flex items-center gap-5 text-sm text-deep-blue/40">
+          <span className="font-mono tabular-nums">{formatDuration(elapsedTime)}</span>
+          <span className="w-px h-3.5 bg-deep-blue/10" />
+          <span>{wordCount} {wordCount === 1 ? 'word' : 'words'}</span>
           {blockedPasteCount > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 rounded-full border border-orange-200">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-orange-500">
-                <path d="M8 6V8M8 10H8.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <path d="M3 14L8 3L13 14H3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <span className="text-xs font-medium text-orange-600">
+            <>
+              <span className="w-px h-3.5 bg-deep-blue/10" />
+              <span className="text-deep-blue/50">
                 {blockedPasteCount} paste{blockedPasteCount > 1 ? 's' : ''} blocked
               </span>
-            </div>
+            </>
           )}
         </div>
       </div>
@@ -246,16 +230,16 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
             fontSize: 17,
-            fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
+            fontFamily: 'var(--font-bricolage), system-ui, sans-serif',
             lineHeight: 1.9,
-            padding: { top: 32, bottom: 32 },
+            padding: { top: 40, bottom: 40 },
             renderWhitespace: 'none',
             overviewRulerBorder: false,
             hideCursorInOverviewRuler: true,
             scrollbar: {
               vertical: 'auto',
               horizontal: 'hidden',
-              verticalScrollbarSize: 8,
+              verticalScrollbarSize: 6,
             },
             quickSuggestions: false,
             suggestOnTriggerCharacters: false,
@@ -265,9 +249,9 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
             contextmenu: false,
           }}
         />
-        
+
         {/* Paste blocked overlay */}
-        <div 
+        <div
           className="absolute inset-0 pointer-events-none"
           onPaste={(e) => {
             e.preventDefault();
@@ -277,57 +261,43 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
 
         {/* Empty state hint */}
         {wordCount === 0 && (
-          <div className="absolute top-32 left-0 right-0 flex justify-center pointer-events-none">
-            <div className="text-deep-blue/20 text-sm italic">Start typing to begin your session...</div>
+          <div className="absolute top-36 left-0 right-0 flex justify-center pointer-events-none">
+            <p className="text-deep-blue/20 text-sm">Start typing to begin your session...</p>
           </div>
         )}
       </div>
 
       {/* Footer */}
-      <div className="flex-shrink-0 border-t border-deep-blue/10 bg-gradient-to-r from-cream to-white">
-        {/* Progress bar */}
-        <div className="h-1 bg-deep-blue/5">
-          <div 
-            className="h-full bg-gradient-to-r from-accent to-success transition-all duration-300 ease-out"
+      <div className="flex-shrink-0 border-t border-deep-blue/[0.06]">
+        {/* Progress */}
+        <div className="h-0.5 bg-deep-blue/[0.04]">
+          <div
+            className="h-full bg-deep-blue/20 transition-all duration-500 ease-out"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
-        
-        <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
-          <div className="flex items-center gap-2 text-sm text-deep-blue/50">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="opacity-50">
-              <path d="M8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14Z" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M6 8L7.5 9.5L10 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <span>
-              {wordCount < 10 
-                ? `${10 - wordCount} more word${10 - wordCount === 1 ? '' : 's'} needed`
-                : 'Ready to certify!'
-              }
-            </span>
-          </div>
-          
+
+        <div className="flex items-center justify-between px-5 md:px-8 py-3 md:py-4 bg-cream">
+          <span className="text-sm text-deep-blue/35">
+            {wordCount < 10
+              ? `${10 - wordCount} more word${10 - wordCount === 1 ? '' : 's'} to certify`
+              : 'Ready to certify'
+            }
+          </span>
+
           <button
             onClick={handleSubmit}
             disabled={wordCount < 10}
-            className="group flex items-center gap-2 px-5 md:px-6 py-2.5 bg-deep-blue text-cream rounded-xl font-medium 
+            className="group flex items-center gap-2 px-6 py-2.5 bg-deep-blue text-cream rounded-full font-medium text-sm
                        hover:bg-deep-blue/90 transition-all duration-200
-                       disabled:opacity-40 disabled:cursor-not-allowed
-                       enabled:shadow-lg enabled:shadow-deep-blue/20 enabled:hover:shadow-xl enabled:hover:shadow-deep-blue/30
+                       disabled:opacity-30 disabled:cursor-not-allowed
                        enabled:hover:-translate-y-0.5"
           >
-            {wordCount < 10 ? (
-              <>
-                <span>Complete</span>
-                <span className="text-cream/60 text-sm">({wordCount}/10)</span>
-              </>
-            ) : (
-              <>
-                <span>Complete</span>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="group-hover:translate-x-0.5 transition-transform">
-                  <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </>
+            Complete
+            {wordCount >= 10 && (
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="group-hover:translate-x-0.5 transition-transform">
+                <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             )}
           </button>
         </div>

@@ -32,7 +32,6 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   const playbackRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // First check sessionStorage for recently submitted document
     const stored = sessionStorage.getItem('lastSession');
     if (stored) {
       try {
@@ -61,7 +60,6 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
       }
     }
 
-    // Fetch from API
     fetch(`/api/documents/${hash}`)
       .then(res => res.json())
       .then(data => {
@@ -72,7 +70,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
         }
         setLoading(false);
       })
-      .catch(err => {
+      .catch(() => {
         setError('Failed to load document');
         setLoading(false);
       });
@@ -80,7 +78,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
 
   const startPlayback = () => {
     if (!document?.keystrokeData?.events) return;
-    
+
     setIsPlaying(true);
     setPlaybackText('');
     setPlaybackProgress(0);
@@ -99,11 +97,10 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
       }
 
       const event = keyEvents[currentIndex];
-      
+
       if (event.type === 'delete') {
         currentText = currentText.slice(0, -1);
       } else if (event.key) {
-        // Simulate the key press
         if (event.key === 'Enter') {
           currentText += '\n';
         } else if (event.key === 'Space') {
@@ -113,7 +110,6 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
         } else if (event.key.startsWith('Digit')) {
           currentText += event.key.charAt(5);
         } else {
-          // Handle punctuation and other keys
           const keyMap: Record<string, string> = {
             'Period': '.', 'Comma': ',', 'Semicolon': ';',
             'Quote': "'", 'BracketLeft': '[', 'BracketRight': ']',
@@ -126,13 +122,12 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
       setPlaybackProgress(Math.round((currentIndex / keyEvents.length) * 100));
 
       currentIndex++;
-      
-      // Calculate delay to next keystroke (capped for playback speed)
+
       const nextEvent = keyEvents[currentIndex];
-      const delay = nextEvent 
-        ? Math.min(nextEvent.t - event.t, 200) // Cap at 200ms for watchable playback
+      const delay = nextEvent
+        ? Math.min(nextEvent.t - event.t, 200)
         : 0;
-      
+
       playbackRef.current = window.setTimeout(playNext, Math.max(delay / 3, 10));
     };
 
@@ -159,7 +154,10 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   if (loading) {
     return (
       <div className="fixed inset-0 bg-cream flex items-center justify-center">
-        <div className="text-deep-blue/50">Loading verification...</div>
+        <div className="flex items-center gap-3 text-deep-blue/40">
+          <div className="w-4 h-4 border-2 border-deep-blue/15 border-t-deep-blue/50 rounded-full animate-spin" />
+          <span className="text-sm">Loading verification...</span>
+        </div>
       </div>
     );
   }
@@ -167,23 +165,25 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   if (error || !document) {
     return (
       <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
-        <header className="flex items-center justify-between px-8 py-6 border-b border-deep-blue/10">
-          <Link href="/" className="flex items-center gap-2">
+        <header className="flex items-center px-6 md:px-8 py-6 border-b border-deep-blue/[0.06]">
+          <Link href="/" className="flex items-center gap-2.5">
             <img src="/logo.svg" alt="By My Own Hand" width="24" height="21" className="block" />
             <span className="font-semibold text-deep-blue">By My Own Hand</span>
           </Link>
         </header>
-        <main className="max-w-2xl mx-auto px-8 py-16 text-center">
-          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center text-4xl mx-auto mb-6">
-            ✕
+        <main className="max-w-2xl mx-auto px-6 md:px-8 py-16 text-center">
+          <div className="w-14 h-14 rounded-full bg-deep-blue/5 flex items-center justify-center mx-auto mb-6">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-deep-blue/30">
+              <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
           </div>
-          <h1 className="text-2xl font-bold text-deep-blue mb-2">Document Not Found</h1>
-          <p className="text-deep-blue/60 mb-8">
+          <h1 className="text-2xl font-bold text-deep-blue mb-2 tracking-tight">Document Not Found</h1>
+          <p className="text-deep-blue/50 mb-8">
             This verification link is invalid or the document has been removed.
           </p>
           <Link
             href="/"
-            className="inline-flex px-6 py-3 bg-deep-blue text-cream rounded-lg font-medium hover:bg-deep-blue/90 transition-colors"
+            className="inline-flex px-6 py-3 bg-deep-blue text-cream rounded-full font-medium text-sm hover:bg-deep-blue/90 transition-colors"
           >
             Go Home
           </Link>
@@ -199,67 +199,72 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   return (
     <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
       {/* Header */}
-      <header className="flex items-center justify-between px-8 py-6 border-b border-deep-blue/10">
-        <Link href="/" className="flex items-center gap-2">
+      <header className="flex items-center justify-between px-6 md:px-8 py-6 border-b border-deep-blue/[0.06]">
+        <Link href="/" className="flex items-center gap-2.5">
           <img src="/logo.svg" alt="By My Own Hand" width="24" height="21" className="block" />
           <span className="font-semibold text-deep-blue">By My Own Hand</span>
         </Link>
-        <span className="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full">
-          ✓ Verified
-        </span>
+        <div className="flex items-center gap-2 text-success">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M4 8L7 11L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span className="text-sm font-medium">Verified</span>
+        </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-8 py-12">
-        {/* Verified badge */}
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-            <span className="text-3xl">✓</span>
+      <main className="max-w-3xl mx-auto px-6 md:px-8 py-12">
+        {/* Document header */}
+        <div className="flex items-start gap-4 mb-10">
+          <div className="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-success">
+              <path d="M6 10L9 13L14 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-deep-blue">{document.title}</h1>
-            <p className="text-deep-blue/60">
-              Certified as authentically human-written
-            </p>
+            <h1 className="text-2xl font-bold text-deep-blue tracking-tight">{document.title}</h1>
+            <p className="text-deep-blue/45 mt-1">Certified as authentically human-written</p>
           </div>
         </div>
 
-        {/* Stats bar */}
-        <div className="grid grid-cols-4 gap-4 mb-8 p-4 bg-white rounded-xl border border-deep-blue/10">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-deep-blue">{document.wordCount}</div>
-            <div className="text-sm text-deep-blue/50">Words</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-deep-blue">{formatDuration(document.writingTimeMs)}</div>
-            <div className="text-sm text-deep-blue/50">Duration</div>
-          </div>
-          <div className="text-center">
-            <div className={`text-2xl font-bold ${scoreInfo.color}`}>{integrityScore}</div>
-            <div className="text-sm text-deep-blue/50">Authenticity</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-deep-blue">{metrics?.blockedPastes || 0}</div>
-            <div className="text-sm text-deep-blue/50">Pastes Blocked</div>
+        {/* Stats */}
+        <div className="bg-white rounded-2xl border border-deep-blue/[0.06] overflow-hidden mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-deep-blue/[0.04]">
+            <div className="bg-white text-center p-5">
+              <div className="text-2xl font-bold text-deep-blue mb-0.5">{document.wordCount}</div>
+              <div className="text-xs text-deep-blue/35 uppercase tracking-wider">Words</div>
+            </div>
+            <div className="bg-white text-center p-5">
+              <div className="text-2xl font-bold text-deep-blue mb-0.5">{formatDuration(document.writingTimeMs)}</div>
+              <div className="text-xs text-deep-blue/35 uppercase tracking-wider">Duration</div>
+            </div>
+            <div className="bg-white text-center p-5">
+              <div className={`text-2xl font-bold ${scoreInfo.color} mb-0.5`}>{integrityScore}</div>
+              <div className="text-xs text-deep-blue/35 uppercase tracking-wider">{scoreInfo.label}</div>
+            </div>
+            <div className="bg-white text-center p-5">
+              <div className="text-2xl font-bold text-deep-blue mb-0.5">{metrics?.blockedPastes || 0}</div>
+              <div className="text-xs text-deep-blue/35 uppercase tracking-wider">Pastes Blocked</div>
+            </div>
           </div>
         </div>
 
         {/* Writing playback */}
-        <div className="bg-white rounded-xl border border-deep-blue/10 overflow-hidden mb-8">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-deep-blue/10 bg-deep-blue/5">
-            <span className="text-sm font-medium text-deep-blue">Writing Playback</span>
+        <div className="bg-white rounded-2xl border border-deep-blue/[0.06] overflow-hidden mb-8">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-deep-blue/[0.04]">
+            <span className="text-xs font-semibold text-deep-blue/35 uppercase tracking-wider">Writing Playback</span>
             <div className="flex items-center gap-3">
               {playbackProgress > 0 && playbackProgress < 100 && (
-                <span className="text-sm text-deep-blue/50">{playbackProgress}%</span>
+                <span className="text-xs text-deep-blue/35 tabular-nums font-mono">{playbackProgress}%</span>
               )}
               <button
                 onClick={isPlaying ? stopPlayback : startPlayback}
-                className="px-4 py-1.5 bg-deep-blue text-cream text-sm font-medium rounded-lg hover:bg-deep-blue/90 transition-colors"
+                className="px-4 py-1.5 bg-deep-blue text-cream text-xs font-medium rounded-full hover:bg-deep-blue/90 transition-colors"
               >
                 {isPlaying ? 'Stop' : 'Play'}
               </button>
             </div>
           </div>
-          <div className="p-6 min-h-[200px] max-h-[400px] overflow-y-auto font-mono text-sm whitespace-pre-wrap">
+          <div className="p-6 min-h-[200px] max-h-[400px] overflow-y-auto text-[0.95rem] leading-relaxed whitespace-pre-wrap text-deep-blue/80">
             {isPlaying ? (
               <>
                 {playbackText}
@@ -273,63 +278,63 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
 
         {/* Detailed metrics */}
         {metrics && (
-          <div className="bg-white rounded-xl border border-deep-blue/10 p-6">
-            <h3 className="text-lg font-semibold text-deep-blue mb-4">Writing Analysis</h3>
+          <div className="mb-8">
+            <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-6">Writing Analysis</p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
               <MetricItem label="Avg Keystroke" value={`${metrics.avgKeystrokeInterval}ms`} />
               <MetricItem label="Variance" value={metrics.keystrokeVariance.toFixed(2)} />
-              <MetricItem label="Thinking Pauses" value={metrics.pauseCount} />
+              <MetricItem label="Thinking Pauses" value={String(metrics.pauseCount)} />
               <MetricItem label="Deletion Rate" value={`${(metrics.deletionRate * 100).toFixed(1)}%`} />
               <MetricItem label="Longest Burst" value={`${metrics.longestBurst} chars`} />
-              <MetricItem 
-                label="WPM" 
-                value={Math.round((document.wordCount / document.writingTimeMs) * 60000)} 
+              <MetricItem
+                label="WPM"
+                value={String(Math.round((document.wordCount / document.writingTimeMs) * 60000))}
               />
             </div>
           </div>
         )}
 
         {/* Verification hash */}
-        <div className="mt-8 p-4 bg-deep-blue/5 rounded-lg text-center">
-          <span className="text-xs text-deep-blue/50 uppercase tracking-wider">Verification Hash</span>
-          <p className="font-mono text-deep-blue">{hash}</p>
+        <div className="pt-8 border-t border-deep-blue/[0.06] text-center">
+          <span className="text-xs text-deep-blue/30 uppercase tracking-wider">Verification Hash</span>
+          <p className="font-mono text-sm text-deep-blue/60 mt-1 break-all">{hash}</p>
         </div>
       </main>
     </div>
   );
 }
 
-function MetricItem({ label, value }: { label: string; value: string | number }) {
+function MetricItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <span className="text-sm text-deep-blue/50">{label}</span>
-      <p className="text-lg font-medium text-deep-blue">{value}</p>
+      <span className="text-xs text-deep-blue/35 uppercase tracking-wider block mb-1">{label}</span>
+      <p className="text-xl font-semibold text-deep-blue">{value}</p>
     </div>
   );
 }
 
 function getScoreLabel(score: number) {
-  if (score >= 90) return { label: 'Excellent', color: 'text-green-600' };
-  if (score >= 70) return { label: 'Good', color: 'text-blue-600' };
-  if (score >= 50) return { label: 'Moderate', color: 'text-yellow-600' };
+  if (score >= 90) return { label: 'Excellent', color: 'text-success' };
+  if (score >= 70) return { label: 'Good', color: 'text-accent' };
+  if (score >= 50) return { label: 'Moderate', color: 'text-warning' };
   return { label: 'Low', color: 'text-red-600' };
 }
 
 function calculateIntegrityFromMetrics(metrics: WritingMetrics, wordCount: number, writingTimeMs: number): number {
   let score = 100;
-  
+
   if (metrics.blockedPastes > 0) {
     score -= Math.min(30, metrics.blockedPastes * 10);
   }
-  
+
   const wpm = (wordCount / writingTimeMs) * 60000;
   if (wpm > 150) score -= 20;
   else if (wpm > 200) score -= 40;
-  
+
   if (metrics.keystrokeVariance < 0.1) score -= 15;
   if (metrics.pauseCount === 0 && wordCount > 100) score -= 10;
   if (metrics.deletionRate === 0 && wordCount > 50) score -= 5;
   else if (metrics.deletionRate > 0.3) score -= 10;
-  
+
   return Math.max(0, Math.min(100, score));
 }
