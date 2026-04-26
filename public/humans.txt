@@ -1,0 +1,6 @@
+/* TEAM */
+Founder: David Hurley
+Site: https://dbhurley.com
+Twitter: @dbhurley
+/* SITE */
+Software: Next.js 16, React 19, TypeScript, Tailwind CSS 4, Monaco Editor, Neon Postgres
