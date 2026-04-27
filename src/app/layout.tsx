@@ -13,9 +13,25 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://bymyownhand.com";
+
 export const metadata: Metadata = {
-  title: "By My Own Hand | Prove Your Writing is Human",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "By My Own Hand | Prove Your Writing is Human",
+    template: "%s | By My Own Hand",
+  },
   description: "Certify your writing was created by your own hands. Block AI, capture keystrokes, prove authenticity.",
+  applicationName: "By My Own Hand",
+  keywords: [
+    "human writing",
+    "AI detection",
+    "writing authenticity",
+    "keystroke verification",
+    "proof of human",
+    "content provenance",
+  ],
+  alternates: { canonical: "/" },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -27,8 +43,20 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "By My Own Hand",
-    description: "Prove your writing is authentically human",
+    description: "Prove your writing is authentically human — keystroke by keystroke.",
+    url: siteUrl,
+    siteName: "By My Own Hand",
     type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "By My Own Hand",
+    description: "Prove your writing is authentically human — keystroke by keystroke.",
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 };
 

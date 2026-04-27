@@ -2,8 +2,8 @@
 
 import { useEffect, useState, use, useRef } from 'react';
 import Link from 'next/link';
-import type { Document, WritingMetrics, KeystrokeEvent } from '@/lib/types';
-import { formatDuration } from '@/lib/metrics';
+import type { WritingMetrics, KeystrokeEvent } from '@/lib/types';
+import { calculateIntegrityScore, formatDuration } from '@/lib/metrics';
 
 interface DocumentData {
   id: string;
@@ -193,8 +193,11 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   }
 
   const metrics = document.keystrokeData?.metrics;
-  const integrityScore = metrics ? calculateIntegrityFromMetrics(metrics, document.wordCount, document.writingTimeMs) : 75;
+  const integrityScore = metrics ? calculateIntegrityScore(metrics, document.wordCount, document.writingTimeMs) : 75;
   const scoreInfo = getScoreLabel(integrityScore);
+  const wpm = document.writingTimeMs > 0
+    ? Math.round((document.wordCount / document.writingTimeMs) * 60000)
+    : 0;
 
   return (
     <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
@@ -286,10 +289,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
               <MetricItem label="Thinking Pauses" value={String(metrics.pauseCount)} />
               <MetricItem label="Deletion Rate" value={`${(metrics.deletionRate * 100).toFixed(1)}%`} />
               <MetricItem label="Longest Burst" value={`${metrics.longestBurst} chars`} />
-              <MetricItem
-                label="WPM"
-                value={String(Math.round((document.wordCount / document.writingTimeMs) * 60000))}
-              />
+              <MetricItem label="WPM" value={String(wpm)} />
             </div>
           </div>
         )}
@@ -320,21 +320,3 @@ function getScoreLabel(score: number) {
   return { label: 'Low', color: 'text-red-600' };
 }
 
-function calculateIntegrityFromMetrics(metrics: WritingMetrics, wordCount: number, writingTimeMs: number): number {
-  let score = 100;
-
-  if (metrics.blockedPastes > 0) {
-    score -= Math.min(30, metrics.blockedPastes * 10);
-  }
-
-  const wpm = (wordCount / writingTimeMs) * 60000;
-  if (wpm > 150) score -= 20;
-  else if (wpm > 200) score -= 40;
-
-  if (metrics.keystrokeVariance < 0.1) score -= 15;
-  if (metrics.pauseCount === 0 && wordCount > 100) score -= 10;
-  if (metrics.deletionRate === 0 && wordCount > 50) score -= 5;
-  else if (metrics.deletionRate > 0.3) score -= 10;
-
-  return Math.max(0, Math.min(100, score));
-}

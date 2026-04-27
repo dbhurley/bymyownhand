@@ -165,7 +165,7 @@ export default function Home() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <img src="/logo.svg" alt="" width="16" height="14" className="block opacity-25" />
-              <span>&copy; 2025 By My Own Hand</span>
+              <span>&copy; {new Date().getFullYear()} By My Own Hand</span>
             </div>
             <span className="hidden md:inline text-deep-blue/15">|</span>
             <Link href="/blog" className="hover:text-deep-blue/60 transition-colors hidden md:inline">Blog</Link>

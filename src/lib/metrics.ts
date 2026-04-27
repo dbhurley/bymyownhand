@@ -65,11 +65,11 @@ export function calculateIntegrityScore(metrics: WritingMetrics, wordCount: numb
   }
   
   // Check if typing speed is humanly plausible (40-150 WPM typical)
-  const wpm = (wordCount / writingTimeMs) * 60000;
-  if (wpm > 150) {
-    score -= 20; // Suspiciously fast
-  } else if (wpm > 200) {
+  const wpm = writingTimeMs > 0 ? (wordCount / writingTimeMs) * 60000 : 0;
+  if (wpm > 200) {
     score -= 40; // Almost certainly not human-typed
+  } else if (wpm > 150) {
+    score -= 20; // Suspiciously fast
   }
   
   // Natural typing has variance
