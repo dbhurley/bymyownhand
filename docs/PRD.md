@@ -1,6 +1,6 @@
 # By My Own Hand — Product Requirements Document
 
-> **Last updated:** 2026-04-27
+> **Last updated:** 2026-04-28
 > **Status:** Living document — evolves with the roadmap
 > **Owner:** DB Hurley
 
@@ -90,10 +90,15 @@ Computed at submission time:
 - JSON Feed at `/api/blog/feed.json`.
 - `llms.txt`, `humans.txt`, full Open Graph + Twitter card metadata, canonical URL via `metadataBase`.
 
-### 6.6 Reliability fixes (this revision)
+### 6.6 Reliability fixes (prior revision)
 - WPM penalty branches reordered so the `>200 WPM` rule is reachable; divide-by-zero in WPM computation guarded.
 - Duplicated integrity-scoring logic in the verify page replaced with a single shared helper.
 - Footer year now derives from `Date.now()` instead of a hard-coded `2025`.
+
+### 6.7 Stickiness foundations (this revision)
+- **Draft auto-save** — the locked editor persists a snapshot (title, content, full keystroke trace, blocked-paste count, original `startTime`) to `localStorage` every 3s and on `beforeunload`. Drafts <24h old surface as a Resume banner on `/write`; resuming preserves the keystroke timeline so the integrity score remains coherent. Drafts are cleared on successful certification.
+- **Share + embed surface on `/success`** — Post-on-X and Share-on-LinkedIn buttons with an auto-generated proof message; a copy-to-clipboard Markdown badge snippet that links any embed back to the verification page. Every embed becomes a recurring brand impression, kicking off the Phase 1.3 flywheel before the full `embed.js` ships.
+- **Real `averageWordLength` metric** — previously hard-coded to `5`; now computed from the certified content so the writing-analysis panel reflects actual prose density. Removed an unused `lastContentRef` from `LockedEditor` along the way.
 
 ---
 
@@ -112,11 +117,12 @@ Computed at submission time:
 The platform is currently a single-shot tool: write once, share once, leave. To increase return-rate and stickiness with the target audience we are investing in:
 
 1. **A persistent author identity** — optional accounts so writers can collect their certified pieces in one shareable profile.
-2. **Embeddable verification badges** — a one-line `<script>` writers paste on Substack, Ghost, personal sites — every certified piece on the open web becomes a backlink and a brand impression.
+2. **Embeddable verification badges** — a one-line `<script>` writers paste on Substack, Ghost, personal sites — every certified piece on the open web becomes a backlink and a brand impression. *(Phase 1.3, partially live: the success page now ships a copyable Markdown badge.)*
 3. **Writing streaks & habits** — gamified "7-day human-written streak" emails turn the certifier into a daily writing ritual.
-4. **Saved drafts** — `localStorage`-backed in-progress drafts so a closed tab doesn't lose work.
-5. **API + integrations** — a public API for educators, hiring platforms, and CMS plugins (WordPress, Ghost, Substack) so verification happens where writers already work.
-6. **Public proof feed** — an opt-in feed of recently certified pieces; signals network activity, drives discovery.
+4. **Saved drafts** — `localStorage`-backed in-progress drafts so a closed tab doesn't lose work. *(Shipped in this revision.)*
+5. **Native social distribution** — one-click "Post on X" / "Share on LinkedIn" actions auto-write the proof copy so sharing happens inside the success flow. *(Shipped in this revision.)*
+6. **API + integrations** — a public API for educators, hiring platforms, and CMS plugins (WordPress, Ghost, Substack) so verification happens where writers already work.
+7. **Public proof feed** — an opt-in feed of recently certified pieces; signals network activity, drives discovery.
 
 These are detailed and sequenced in [ROADMAP.md](ROADMAP.md).
 

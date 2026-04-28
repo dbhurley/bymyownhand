@@ -1,6 +1,6 @@
 import type { KeystrokeEvent, WritingMetrics } from './types';
 
-export function calculateMetrics(events: KeystrokeEvent[]): WritingMetrics {
+export function calculateMetrics(events: KeystrokeEvent[], content = ''): WritingMetrics {
   const keyEvents = events.filter(e => e.type === 'key');
   const deleteEvents = events.filter(e => e.type === 'delete');
   const blockedPastes = events.filter(e => e.type === 'paste_blocked').length;
@@ -42,9 +42,12 @@ export function calculateMetrics(events: KeystrokeEvent[]): WritingMetrics {
     }
   }
   
-  // Average word length (rough estimate from final content)
-  const averageWordLength = 5; // Will be calculated from content separately
-  
+  // Average word length, derived from the final content
+  const words = content.trim().split(/\s+/).filter(Boolean);
+  const averageWordLength = words.length > 0
+    ? Math.round((words.reduce((sum, w) => sum + w.length, 0) / words.length) * 10) / 10
+    : 0;
+
   return {
     avgKeystrokeInterval: Math.round(avgKeystrokeInterval),
     keystrokeVariance: Math.round(keystrokeVariance * 100) / 100,

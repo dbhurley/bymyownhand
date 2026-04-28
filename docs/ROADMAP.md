@@ -1,6 +1,6 @@
 # By My Own Hand — Roadmap
 
-> **Last updated:** 2026-04-27
+> **Last updated:** 2026-04-28
 > Companion to [PRD.md](PRD.md). Items are grouped by phase, not by date — phase boundaries shift with traction signals.
 
 The North Star: **make the act of writing — verifiably and beautifully human — a daily ritual that writers proudly share.**
@@ -18,21 +18,27 @@ The North Star: **make the act of writing — verifiably and beautifully human �
 - ✅ 44+ blog posts on identity, AI, content provenance
 - ✅ JSON Feed, llms.txt, humans.txt, Open Graph + Twitter card metadata, canonical URL
 
-### Reliability & polish (this revision)
+### Reliability & polish (prior revision)
 - ✅ Fixed WPM scoring bug — `>200 WPM` rule was unreachable; reordered branches and guarded divide-by-zero
 - ✅ Removed duplicated integrity-scoring logic in the verify page; now sourced from `lib/metrics.ts`
 - ✅ Footer copyright year is now dynamic
 - ✅ Added `metadataBase`, `alternates.canonical`, `twitter` card, `keywords`, and `robots` directives so shared verification links and the marketing site render rich previews on social
 
+### Stickiness foundations (this revision)
+- ✅ **Draft auto-save** — `localStorage` snapshot every 3s and on `beforeunload`; Resume banner on `/write` for drafts <24h old; resuming preserves the keystroke trace so integrity scoring stays coherent
+- ✅ **Share + embed surface** — Post-on-X / Share-on-LinkedIn buttons on `/success`, plus a copyable Markdown badge snippet (first surface for Phase 1.3 before `embed.js` ships)
+- ✅ **Real `averageWordLength` metric** — computed from certified content instead of the previous hard-coded `5`; removed dead `lastContentRef` in `LockedEditor`
+
 ---
 
-## Phase 1 — Stickiness Foundations (next)
+## Phase 1 — Stickiness Foundations (in flight)
 
 The current product is single-shot. Phase 1 turns each certified piece into a reason to come back tomorrow.
 
-### 1.1 Drafts that survive the tab closing
-- Auto-save in-progress drafts to `localStorage` (and to the DB if signed in).
-- Resume banner on `/write` when an unfinished session exists.
+### 1.1 Drafts that survive the tab closing — ✅ shipped
+- ✅ Auto-save in-progress drafts to `localStorage` with full keystroke trace.
+- ✅ Resume banner on `/write` when an unfinished session exists.
+- ☐ Persist drafts to the DB once optional accounts ship (1.2).
 - *Why it matters:* Today, an accidental tab-close erases work. That single event kills retention.
 
 ### 1.2 Author profiles (optional accounts)
@@ -41,9 +47,10 @@ The current product is single-shot. Phase 1 turns each certified piece into a re
 - Wire up the existing `users` table (already in schema, currently unused).
 - *Why it matters:* Converts one-time visitors into named writers with a portfolio they can link to.
 
-### 1.3 Embeddable "Verified Human" badge
-- One-line `<script src="https://bymyownhand.com/embed.js" data-hash="bmoh-..." />` snippet that renders a small trust badge linking to the verification page.
-- Optional `iframe` and Markdown variants for Substack/Ghost/Notion.
+### 1.3 Embeddable "Verified Human" badge — partial
+- ✅ Markdown badge snippet on `/success` (copy-and-paste into Substack, Ghost, Notion, READMEs).
+- ☐ One-line `<script src="https://bymyownhand.com/embed.js" data-hash="bmoh-..." />` snippet that renders a small trust badge linking to the verification page.
+- ☐ `iframe` variant for hosts that strip script tags.
 - *Why it matters:* Every embed is a backlink, a recurring brand impression, and a network effect — the badge in the wild becomes the marketing surface.
 
 ### 1.4 Writing streaks
@@ -51,10 +58,11 @@ The current product is single-shot. Phase 1 turns each certified piece into a re
 - Optional weekly digest email: "You wrote 4 pieces this week, 92 avg integrity score."
 - *Why it matters:* Habit formation. Converts a tool into a daily ritual.
 
-### 1.5 Verification page UX upgrades
-- "Tweet this proof" / "Copy LinkedIn snippet" share buttons with auto-generated copy.
-- A static OG image for `/verify/<hash>` that renders the title + integrity score + word count, so social shares look polished.
-- "How we verified this" expandable explainer (educates first-time visitors who arrived via a shared link).
+### 1.5 Verification page UX upgrades — partial
+- ✅ "Post on X" / "Share on LinkedIn" buttons live on the `/success` confirmation page with auto-generated proof copy.
+- ☐ Mirror the share + embed surface on `/verify/<hash>` so visitors arriving cold can share too.
+- ☐ A static OG image for `/verify/<hash>` that renders the title + integrity score + word count, so social shares look polished.
+- ☐ "How we verified this" expandable explainer (educates first-time visitors who arrived via a shared link).
 
 ---
 

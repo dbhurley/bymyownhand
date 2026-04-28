@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import type { WritingSession } from '@/lib/types';
+import { clearDraft, formatDraftAge, loadDraft, type DraftSnapshot } from '@/lib/draft';
 
 // Dynamic import for Monaco to avoid SSR issues
 const LockedEditor = dynamic(() => import('@/components/LockedEditor'), {
@@ -19,11 +20,33 @@ const LockedEditor = dynamic(() => import('@/components/LockedEditor'), {
   ),
 });
 
+type DraftDecision = 'pending' | 'resume' | 'fresh';
+
 export default function WritePage() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<DraftSnapshot | null>(null);
+  const [decision, setDecision] = useState<DraftDecision>('pending');
+
+  useEffect(() => {
+    const existing = loadDraft();
+    if (existing) {
+      setDraft(existing);
+      setTitle(existing.title);
+    } else {
+      setDecision('fresh');
+    }
+  }, []);
+
+  const handleResume = () => setDecision('resume');
+  const handleDiscard = () => {
+    clearDraft();
+    setDraft(null);
+    setTitle('');
+    setDecision('fresh');
+  };
 
   const handleComplete = async (session: WritingSession) => {
     setIsSubmitting(true);
@@ -88,11 +111,63 @@ export default function WritePage() {
 
       {/* Editor */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        <LockedEditor
-          title={title}
-          onTitleChange={setTitle}
-          onComplete={handleComplete}
-        />
+        {decision === 'pending' && draft ? (
+          <ResumeBanner
+            draft={draft}
+            onResume={handleResume}
+            onDiscard={handleDiscard}
+          />
+        ) : decision !== 'pending' ? (
+          <LockedEditor
+            title={title}
+            onTitleChange={setTitle}
+            onComplete={handleComplete}
+            initialDraft={decision === 'resume' ? draft : null}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ResumeBanner({
+  draft,
+  onResume,
+  onDiscard,
+}: {
+  draft: DraftSnapshot;
+  onResume: () => void;
+  onDiscard: () => void;
+}) {
+  const wordCount = draft.content.trim().split(/\s+/).filter(Boolean).length;
+  return (
+    <div className="h-full flex items-center justify-center px-6 bg-cream">
+      <div className="max-w-md w-full bg-white rounded-2xl border border-deep-blue/[0.08] p-6 md:p-8 shadow-sm">
+        <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-3">
+          Unfinished draft
+        </p>
+        <h2 className="text-2xl font-bold text-deep-blue mb-2 tracking-tight">
+          Resume where you left off?
+        </h2>
+        <p className="text-deep-blue/50 mb-6 leading-relaxed">
+          We saved <span className="font-semibold text-deep-blue/70">{draft.title || 'an untitled draft'}</span>
+          {' '}({wordCount} word{wordCount === 1 ? '' : 's'}, {formatDraftAge(draft.savedAt)}).
+          Resuming preserves your full keystroke trace.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={onResume}
+            className="flex-1 px-5 py-3 bg-deep-blue text-cream rounded-full font-medium text-sm hover:bg-deep-blue/90 transition-colors"
+          >
+            Resume draft
+          </button>
+          <button
+            onClick={onDiscard}
+            className="flex-1 px-5 py-3 border border-deep-blue/15 text-deep-blue rounded-full font-medium text-sm hover:bg-deep-blue/5 transition-colors"
+          >
+            Start fresh
+          </button>
+        </div>
       </div>
     </div>
   );

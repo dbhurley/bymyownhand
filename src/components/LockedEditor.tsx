@@ -4,27 +4,28 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
 import type { KeystrokeEvent, WritingSession } from '@/lib/types';
 import { calculateMetrics, calculateIntegrityScore, formatDuration } from '@/lib/metrics';
+import { DRAFT_STORAGE_KEY, type DraftSnapshot } from '@/lib/draft';
 import { nanoid } from 'nanoid';
 
 interface LockedEditorProps {
   onComplete: (session: WritingSession) => void;
   title: string;
   onTitleChange: (title: string) => void;
+  initialDraft?: DraftSnapshot | null;
 }
 
-export default function LockedEditor({ onComplete, title, onTitleChange }: LockedEditorProps) {
-  const [content, setContent] = useState('');
+export default function LockedEditor({ onComplete, title, onTitleChange, initialDraft }: LockedEditorProps) {
+  const [content, setContent] = useState(initialDraft?.content ?? '');
   const [wordCount, setWordCount] = useState(0);
-  const [sessionId] = useState(() => nanoid());
-  const [startTime] = useState(() => Date.now());
+  const [sessionId] = useState(() => initialDraft?.sessionId ?? nanoid());
+  const [startTime] = useState(() => initialDraft?.startTime ?? Date.now());
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [blockedPasteCount, setBlockedPasteCount] = useState(0);
+  const [blockedPasteCount, setBlockedPasteCount] = useState(() => initialDraft?.blockedPasteCount ?? 0);
   const [isRecording, setIsRecording] = useState(true);
 
-  const eventsRef = useRef<KeystrokeEvent[]>([]);
+  const eventsRef = useRef<KeystrokeEvent[]>(initialDraft?.events ?? []);
   const internalClipboard = useRef<string>('');
   const editorRef = useRef<any>(null);
-  const lastContentRef = useRef<string>('');
 
   // Update elapsed time every second
   useEffect(() => {
@@ -153,15 +154,45 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
   };
 
   const handleEditorChange = (value: string | undefined) => {
-    const newContent = value || '';
-    lastContentRef.current = newContent;
-    setContent(newContent);
+    setContent(value || '');
   };
+
+  // Auto-save the in-progress draft to localStorage. The full keystroke trace
+  // is preserved so a resumed session keeps integrity scoring intact.
+  useEffect(() => {
+    if (!isRecording) return;
+    if (typeof window === 'undefined') return;
+
+    const persist = () => {
+      if (!content.trim() && !title.trim()) return;
+      const snapshot: DraftSnapshot = {
+        sessionId,
+        title,
+        content,
+        events: eventsRef.current,
+        startTime,
+        blockedPasteCount,
+        savedAt: Date.now(),
+      };
+      try {
+        window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
+      } catch {
+        // Quota exceeded or storage disabled — silently skip.
+      }
+    };
+
+    const interval = window.setInterval(persist, 3000);
+    window.addEventListener('beforeunload', persist);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('beforeunload', persist);
+    };
+  }, [content, title, sessionId, startTime, blockedPasteCount, isRecording]);
 
   const handleSubmit = () => {
     setIsRecording(false);
 
-    const metrics = calculateMetrics(eventsRef.current);
+    const metrics = calculateMetrics(eventsRef.current, content);
     const integrityScore = calculateIntegrityScore(metrics, wordCount, elapsedTime);
 
     const session: WritingSession = {
@@ -174,6 +205,10 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
       wordCount,
       integrityScore,
     };
+
+    if (typeof window !== 'undefined') {
+      try { window.localStorage.removeItem(DRAFT_STORAGE_KEY); } catch {}
+    }
 
     onComplete(session);
   };
