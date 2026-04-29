@@ -198,8 +198,9 @@ export function Certificate({
   certifiedAt,
   qrCodeDataUrl,
 }: CertificateProps) {
-  const verifyUrl = `https://bymyownhand.com/verify/${verificationHash}`;
-  const wpm = Math.round((wordCount / writingTimeMs) * 60000);
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://bymyownhand.com';
+  const verifyUrl = `${siteUrl}/verify/${verificationHash}`;
+  const wpm = writingTimeMs > 0 ? Math.round((wordCount / writingTimeMs) * 60000) : 0;
 
   return (
     <Document>

@@ -16,6 +16,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Mirror the editor's 10-word submission gate so the API can't be used
+    // to mint certificates around documents that never met the threshold.
+    const trimmedWords = session.content.trim().split(/\s+/).filter(Boolean).length;
+    if (trimmedWords < 10) {
+      return NextResponse.json(
+        { error: 'Document must contain at least 10 words to be certified' },
+        { status: 400 }
+      );
+    }
+
+    if (!Array.isArray(session.events) || session.events.length === 0) {
+      return NextResponse.json(
+        { error: 'Keystroke trace is required for certification' },
+        { status: 400 }
+      );
+    }
+
     const docId = nanoid();
     const verificationHash = generateVerificationHash();
     const writingTimeMs = (session.endedAt || Date.now()) - session.startedAt;

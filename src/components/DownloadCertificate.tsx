@@ -30,7 +30,8 @@ export function DownloadCertificate({
     
     try {
       // Generate QR code
-      const verifyUrl = `https://bymyownhand.com/verify/${verificationHash}`;
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://bymyownhand.com';
+      const verifyUrl = `${siteUrl}/verify/${verificationHash}`;
       const qrCodeDataUrl = await QRCode.toDataURL(verifyUrl, {
         width: 200,
         margin: 1,

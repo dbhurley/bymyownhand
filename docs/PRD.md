@@ -1,6 +1,6 @@
 # By My Own Hand — Product Requirements Document
 
-> **Last updated:** 2026-04-28
+> **Last updated:** 2026-04-29
 > **Status:** Living document — evolves with the roadmap
 > **Owner:** DB Hurley
 
@@ -95,10 +95,16 @@ Computed at submission time:
 - Duplicated integrity-scoring logic in the verify page replaced with a single shared helper.
 - Footer year now derives from `Date.now()` instead of a hard-coded `2025`.
 
-### 6.7 Stickiness foundations (this revision)
+### 6.7 Stickiness foundations (prior revision)
 - **Draft auto-save** — the locked editor persists a snapshot (title, content, full keystroke trace, blocked-paste count, original `startTime`) to `localStorage` every 3s and on `beforeunload`. Drafts <24h old surface as a Resume banner on `/write`; resuming preserves the keystroke timeline so the integrity score remains coherent. Drafts are cleared on successful certification.
 - **Share + embed surface on `/success`** — Post-on-X and Share-on-LinkedIn buttons with an auto-generated proof message; a copy-to-clipboard Markdown badge snippet that links any embed back to the verification page. Every embed becomes a recurring brand impression, kicking off the Phase 1.3 flywheel before the full `embed.js` ships.
 - **Real `averageWordLength` metric** — previously hard-coded to `5`; now computed from the certified content so the writing-analysis panel reflects actual prose density. Removed an unused `lastContentRef` from `LockedEditor` along the way.
+
+### 6.8 Reliability + config polish (this revision)
+- **WPM divide-by-zero in `Certificate.tsx`** — the PDF certificate's WPM stat could render as `Infinity`/`NaN` for sub-millisecond writing windows; now guarded the same way as the in-app metrics path.
+- **Honor `NEXT_PUBLIC_SITE_URL` everywhere** — certificate verify links, the embedded QR code, and the on-page share copy now resolve through the documented env var instead of a hard-coded production domain. Staging, custom domains, and locally-served previews all produce correct proof links.
+- **Server-side certification gate** — `/api/documents` now rejects submissions with fewer than 10 words *or* an empty keystroke trace. The 10-word minimum was previously enforced only in the client editor, so a direct POST could mint a hash for an empty document.
+- **Shared `getScoreLabel()` helper** — the duplicated label/colour mapping in `success/[hash]` and `verify/[hash]` is now exported from `lib/metrics.ts`, so changes to score thresholds propagate everywhere at once (mirrors the prior dedupe of the integrity-score calculation).
 
 ---
 

@@ -3,7 +3,7 @@
 import { useEffect, useState, use, useRef } from 'react';
 import Link from 'next/link';
 import type { WritingMetrics, KeystrokeEvent } from '@/lib/types';
-import { calculateIntegrityScore, formatDuration } from '@/lib/metrics';
+import { calculateIntegrityScore, formatDuration, getScoreLabel } from '@/lib/metrics';
 
 interface DocumentData {
   id: string;
@@ -313,10 +313,4 @@ function MetricItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function getScoreLabel(score: number) {
-  if (score >= 90) return { label: 'Excellent', color: 'text-success' };
-  if (score >= 70) return { label: 'Good', color: 'text-accent' };
-  if (score >= 50) return { label: 'Moderate', color: 'text-warning' };
-  return { label: 'Low', color: 'text-red-600' };
-}
 

@@ -95,6 +95,18 @@ export function calculateIntegrityScore(metrics: WritingMetrics, wordCount: numb
   return Math.max(0, Math.min(100, score));
 }
 
+export interface ScoreLabel {
+  label: string;
+  color: string;
+}
+
+export function getScoreLabel(score: number): ScoreLabel {
+  if (score >= 90) return { label: 'Excellent', color: 'text-success' };
+  if (score >= 70) return { label: 'Good', color: 'text-accent' };
+  if (score >= 50) return { label: 'Moderate', color: 'text-warning' };
+  return { label: 'Low', color: 'text-red-600' };
+}
+
 export function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);

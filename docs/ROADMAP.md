@@ -1,6 +1,6 @@
 # By My Own Hand — Roadmap
 
-> **Last updated:** 2026-04-28
+> **Last updated:** 2026-04-29
 > Companion to [PRD.md](PRD.md). Items are grouped by phase, not by date — phase boundaries shift with traction signals.
 
 The North Star: **make the act of writing — verifiably and beautifully human — a daily ritual that writers proudly share.**
@@ -24,10 +24,16 @@ The North Star: **make the act of writing — verifiably and beautifully human �
 - ✅ Footer copyright year is now dynamic
 - ✅ Added `metadataBase`, `alternates.canonical`, `twitter` card, `keywords`, and `robots` directives so shared verification links and the marketing site render rich previews on social
 
-### Stickiness foundations (this revision)
+### Stickiness foundations (prior revision)
 - ✅ **Draft auto-save** — `localStorage` snapshot every 3s and on `beforeunload`; Resume banner on `/write` for drafts <24h old; resuming preserves the keystroke trace so integrity scoring stays coherent
 - ✅ **Share + embed surface** — Post-on-X / Share-on-LinkedIn buttons on `/success`, plus a copyable Markdown badge snippet (first surface for Phase 1.3 before `embed.js` ships)
 - ✅ **Real `averageWordLength` metric** — computed from certified content instead of the previous hard-coded `5`; removed dead `lastContentRef` in `LockedEditor`
+
+### Reliability + config polish (this revision)
+- ✅ **WPM divide-by-zero guard in the PDF certificate** — `Certificate.tsx` was still computing `wordCount / writingTimeMs` unguarded; now matches the prior fix in `lib/metrics.ts`
+- ✅ **Site URL via `NEXT_PUBLIC_SITE_URL`** — Certificate verify links and the QR code in `DownloadCertificate` now honor the documented env var instead of hard-coding the production domain
+- ✅ **Server-side 10-word + keystroke-trace gate** in `POST /api/documents` so a direct API call can no longer mint certificates for empty or trace-less documents
+- ✅ **Shared `getScoreLabel()` helper** in `lib/metrics.ts` — collapses two identical copies in `success/[hash]` and `verify/[hash]` into one source of truth (parallels the prior dedupe of `calculateIntegrityScore`)
 
 ---
 

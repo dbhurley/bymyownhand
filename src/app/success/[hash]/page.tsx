@@ -3,8 +3,8 @@
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import type { WritingSession, WritingMetrics } from '@/lib/types';
-import { formatDuration } from '@/lib/metrics';
+import type { WritingSession } from '@/lib/types';
+import { formatDuration, getScoreLabel } from '@/lib/metrics';
 
 const DownloadCertificate = dynamic(
   () => import('@/components/DownloadCertificate').then(mod => mod.DownloadCertificate),
@@ -45,13 +45,6 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
   const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
   const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(verifyUrl)}`;
   const embedMarkdown = `[![Verified human-written](https://bymyownhand.com/logo.svg)](${verifyUrl})`;
-
-  const getScoreLabel = (score: number) => {
-    if (score >= 90) return { label: 'Excellent', color: 'text-success' };
-    if (score >= 70) return { label: 'Good', color: 'text-accent' };
-    if (score >= 50) return { label: 'Moderate', color: 'text-warning' };
-    return { label: 'Low', color: 'text-red-600' };
-  };
 
   const writingTime = session ? (session.endedAt || Date.now()) - session.startedAt : 0;
   const scoreInfo = session ? getScoreLabel(session.integrityScore || 0) : { label: '', color: '' };
