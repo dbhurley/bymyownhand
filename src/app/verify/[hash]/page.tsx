@@ -4,6 +4,7 @@ import { useEffect, useState, use, useRef } from 'react';
 import Link from 'next/link';
 import type { WritingMetrics, KeystrokeEvent } from '@/lib/types';
 import { calculateIntegrityScore, formatDuration, getScoreLabel } from '@/lib/metrics';
+import { getSiteUrl } from '@/lib/site';
 
 interface DocumentData {
   id: string;
@@ -29,6 +30,8 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackText, setPlaybackText] = useState('');
   const [playbackProgress, setPlaybackProgress] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const [embedCopied, setEmbedCopied] = useState(false);
   const playbackRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -83,15 +86,19 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
     setPlaybackText('');
     setPlaybackProgress(0);
 
+    const content = document.content;
     const events = document.keystrokeData.events;
     const keyEvents = events.filter(e => e.type === 'key' || e.type === 'delete');
     let currentIndex = 0;
-    let currentText = '';
+    // Drive playback positionally from the certified content so cased letters,
+    // unicode, and punctuation render exactly as they were written. The
+    // keystroke trace still controls timing and the typing-vs-deletion rhythm.
+    let forwardCount = 0;
 
     const playNext = () => {
       if (currentIndex >= keyEvents.length) {
         setIsPlaying(false);
-        setPlaybackText(document.content);
+        setPlaybackText(content);
         setPlaybackProgress(100);
         return;
       }
@@ -99,26 +106,12 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
       const event = keyEvents[currentIndex];
 
       if (event.type === 'delete') {
-        currentText = currentText.slice(0, -1);
-      } else if (event.key) {
-        if (event.key === 'Enter') {
-          currentText += '\n';
-        } else if (event.key === 'Space') {
-          currentText += ' ';
-        } else if (event.key.startsWith('Key')) {
-          currentText += event.key.charAt(3).toLowerCase();
-        } else if (event.key.startsWith('Digit')) {
-          currentText += event.key.charAt(5);
-        } else {
-          const keyMap: Record<string, string> = {
-            'Period': '.', 'Comma': ',', 'Semicolon': ';',
-            'Quote': "'", 'BracketLeft': '[', 'BracketRight': ']',
-          };
-          currentText += keyMap[event.key] || '';
-        }
+        forwardCount = Math.max(0, forwardCount - 1);
+      } else {
+        forwardCount = Math.min(content.length, forwardCount + 1);
       }
 
-      setPlaybackText(currentText);
+      setPlaybackText(content.slice(0, forwardCount));
       setPlaybackProgress(Math.round((currentIndex / keyEvents.length) * 100));
 
       currentIndex++;
@@ -198,6 +191,26 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   const wpm = document.writingTimeMs > 0
     ? Math.round((document.wordCount / document.writingTimeMs) * 60000)
     : 0;
+
+  const verifyUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/verify/${hash}`
+    : `${getSiteUrl()}/verify/${hash}`;
+  const tweetText = `"${document.title}" was written by hand — every keystroke proven human. ${verifyUrl}`;
+  const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+  const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(verifyUrl)}`;
+  const embedMarkdown = `[![Verified human-written](${getSiteUrl()}/logo.svg)](${verifyUrl})`;
+
+  const copyVerifyUrl = async () => {
+    await navigator.clipboard.writeText(verifyUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyEmbed = async () => {
+    await navigator.clipboard.writeText(embedMarkdown);
+    setEmbedCopied(true);
+    setTimeout(() => setEmbedCopied(false), 2000);
+  };
 
   return (
     <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
@@ -293,6 +306,76 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
             </div>
           </div>
         )}
+
+        {/* Share + embed */}
+        <div className="bg-white rounded-2xl border border-deep-blue/[0.06] p-6 md:p-8 mb-8">
+          <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-4">
+            Share this proof
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 mb-6">
+            <button
+              onClick={copyVerifyUrl}
+              className="flex-1 flex items-center justify-center gap-2 px-5 py-3 border border-deep-blue/15 text-deep-blue rounded-full font-medium text-sm hover:bg-deep-blue/5 transition-colors"
+            >
+              {copied ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M4 8L7 11L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Link copied
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <rect x="5" y="5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M11 3H4C3.44772 3 3 3.44772 3 4V11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                  Copy link
+                </>
+              )}
+            </button>
+            <a
+              href={tweetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-2 px-5 py-3 border border-deep-blue/15 text-deep-blue rounded-full font-medium text-sm hover:bg-deep-blue/5 transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M12.6 1.5h2.3L9.7 7.4l5.9 7.1h-4.6L7.5 9.7l-4 4.8H1.2L7 7.7 1.2 1.5h4.7L9 5.7l3.6-4.2zM11.8 13.2h1.3L4.7 2.7H3.3l8.5 10.5z" />
+              </svg>
+              Post on X
+            </a>
+            <a
+              href={linkedInUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-2 px-5 py-3 border border-deep-blue/15 text-deep-blue rounded-full font-medium text-sm hover:bg-deep-blue/5 transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M3.5 1.6a1.4 1.4 0 100 2.8 1.4 1.4 0 000-2.8zM2.2 5.4h2.6V14H2.2V5.4zM6.4 5.4h2.5v1.2h.04c.35-.66 1.21-1.36 2.49-1.36 2.66 0 3.15 1.75 3.15 4.03V14h-2.6V9.78c0-1.01-.02-2.31-1.41-2.31-1.41 0-1.62 1.1-1.62 2.24V14H6.4V5.4z" />
+              </svg>
+              LinkedIn
+            </a>
+          </div>
+
+          <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-3">
+            Embed badge (Markdown)
+          </p>
+          <div className="flex items-stretch gap-3">
+            <code className="flex-1 px-3 py-2.5 bg-deep-blue/[0.04] rounded-lg text-xs font-mono text-deep-blue/70 overflow-x-auto whitespace-nowrap">
+              {embedMarkdown}
+            </code>
+            <button
+              onClick={copyEmbed}
+              className="px-4 py-2.5 bg-deep-blue text-cream rounded-lg font-medium text-xs hover:bg-deep-blue/90 transition-colors flex items-center gap-2"
+            >
+              {embedCopied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <p className="text-xs text-deep-blue/35 mt-3">
+            Paste into Substack, Ghost, Notion, or your README to display a Verified Human badge linking back here.
+          </p>
+        </div>
 
         {/* Verification hash */}
         <div className="pt-8 border-t border-deep-blue/[0.06] text-center">

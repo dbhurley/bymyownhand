@@ -1,6 +1,6 @@
 # By My Own Hand — Roadmap
 
-> **Last updated:** 2026-04-29
+> **Last updated:** 2026-04-30
 > Companion to [PRD.md](PRD.md). Items are grouped by phase, not by date — phase boundaries shift with traction signals.
 
 The North Star: **make the act of writing — verifiably and beautifully human — a daily ritual that writers proudly share.**
@@ -29,11 +29,16 @@ The North Star: **make the act of writing — verifiably and beautifully human �
 - ✅ **Share + embed surface** — Post-on-X / Share-on-LinkedIn buttons on `/success`, plus a copyable Markdown badge snippet (first surface for Phase 1.3 before `embed.js` ships)
 - ✅ **Real `averageWordLength` metric** — computed from certified content instead of the previous hard-coded `5`; removed dead `lastContentRef` in `LockedEditor`
 
-### Reliability + config polish (this revision)
+### Reliability + config polish (prior revision)
 - ✅ **WPM divide-by-zero guard in the PDF certificate** — `Certificate.tsx` was still computing `wordCount / writingTimeMs` unguarded; now matches the prior fix in `lib/metrics.ts`
 - ✅ **Site URL via `NEXT_PUBLIC_SITE_URL`** — Certificate verify links and the QR code in `DownloadCertificate` now honor the documented env var instead of hard-coding the production domain
 - ✅ **Server-side 10-word + keystroke-trace gate** in `POST /api/documents` so a direct API call can no longer mint certificates for empty or trace-less documents
 - ✅ **Shared `getScoreLabel()` helper** in `lib/metrics.ts` — collapses two identical copies in `success/[hash]` and `verify/[hash]` into one source of truth (parallels the prior dedupe of `calculateIntegrityScore`)
+
+### Stickiness + fidelity polish (this revision)
+- ✅ **Share + embed surface on `/verify/<hash>`** — Phase 1.5 ☐ item now shipped: cold visitors can copy the proof link, post to X/LinkedIn, or copy the Markdown embed badge directly from the verification page. Removes the second-order friction blocking the embed flywheel.
+- ✅ **Faithful-cased keystroke playback** — playback in `/verify/<hash>` used to reconstruct text from raw key codes, so cased letters always rendered lowercase until the final snap. Playback is now driven positionally from the certified content while keystroke timing still controls the typing/deletion rhythm.
+- ✅ **`getSiteUrl()` helper in `lib/site.ts`** — collapses four duplicated copies of the `NEXT_PUBLIC_SITE_URL` env-var fallback into one source of truth, and fixes the last hard-coded `bymyownhand.com/logo.svg` URL in the success-page embed badge so staging-generated badges no longer point their logo at production.
 
 ---
 
@@ -66,7 +71,7 @@ The current product is single-shot. Phase 1 turns each certified piece into a re
 
 ### 1.5 Verification page UX upgrades — partial
 - ✅ "Post on X" / "Share on LinkedIn" buttons live on the `/success` confirmation page with auto-generated proof copy.
-- ☐ Mirror the share + embed surface on `/verify/<hash>` so visitors arriving cold can share too.
+- ✅ Share + embed surface mirrored on `/verify/<hash>` — copy-link, Post on X, LinkedIn, and Markdown embed badge are now available directly to cold visitors.
 - ☐ A static OG image for `/verify/<hash>` that renders the title + integrity score + word count, so social shares look polished.
 - ☐ "How we verified this" expandable explainer (educates first-time visitors who arrived via a shared link).
 

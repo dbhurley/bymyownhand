@@ -1,9 +1,10 @@
 import { getAllPosts } from '@/lib/blog';
+import { getSiteUrl } from '@/lib/site';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
   const posts = getAllPosts();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://bymyownhand.com';
+  const siteUrl = getSiteUrl();
 
   const feed = {
     version: 'https://jsonfeed.org/version/1.1',

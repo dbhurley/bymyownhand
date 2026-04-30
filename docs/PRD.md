@@ -1,6 +1,6 @@
 # By My Own Hand — Product Requirements Document
 
-> **Last updated:** 2026-04-29
+> **Last updated:** 2026-04-30
 > **Status:** Living document — evolves with the roadmap
 > **Owner:** DB Hurley
 
@@ -100,11 +100,16 @@ Computed at submission time:
 - **Share + embed surface on `/success`** — Post-on-X and Share-on-LinkedIn buttons with an auto-generated proof message; a copy-to-clipboard Markdown badge snippet that links any embed back to the verification page. Every embed becomes a recurring brand impression, kicking off the Phase 1.3 flywheel before the full `embed.js` ships.
 - **Real `averageWordLength` metric** — previously hard-coded to `5`; now computed from the certified content so the writing-analysis panel reflects actual prose density. Removed an unused `lastContentRef` from `LockedEditor` along the way.
 
-### 6.8 Reliability + config polish (this revision)
+### 6.8 Reliability + config polish (prior revision)
 - **WPM divide-by-zero in `Certificate.tsx`** — the PDF certificate's WPM stat could render as `Infinity`/`NaN` for sub-millisecond writing windows; now guarded the same way as the in-app metrics path.
 - **Honor `NEXT_PUBLIC_SITE_URL` everywhere** — certificate verify links, the embedded QR code, and the on-page share copy now resolve through the documented env var instead of a hard-coded production domain. Staging, custom domains, and locally-served previews all produce correct proof links.
 - **Server-side certification gate** — `/api/documents` now rejects submissions with fewer than 10 words *or* an empty keystroke trace. The 10-word minimum was previously enforced only in the client editor, so a direct POST could mint a hash for an empty document.
 - **Shared `getScoreLabel()` helper** — the duplicated label/colour mapping in `success/[hash]` and `verify/[hash]` is now exported from `lib/metrics.ts`, so changes to score thresholds propagate everywhere at once (mirrors the prior dedupe of the integrity-score calculation).
+
+### 6.9 Stickiness + fidelity polish (this revision)
+- **Cold-visitor share + embed on `/verify/<hash>`** — the share/embed surface that previously only lived on `/success` is now mirrored on the public verification page, so anyone arriving via a shared link can copy the proof link, post to X/LinkedIn, or grab the Markdown badge to embed. Closes the second-order distribution gap that was blocking the embed flywheel.
+- **Faithful-cased keystroke playback** — the `/verify/<hash>` playback used to reconstruct the document from raw key codes (`KeyH` → `h`), so a piece titled "Hello" played back as "hello" before snapping to the final cased text. Playback is now driven positionally from the certified content while keystroke timings still control the typing/deletion rhythm. Result: the playback matches the document the visitor is verifying, end-to-end.
+- **Single `getSiteUrl()` helper** — the four-times-duplicated `process.env.NEXT_PUBLIC_SITE_URL || 'https://bymyownhand.com'` pattern is collapsed into one helper in `lib/site.ts`. The `/success` embed badge image URL was the last place still hard-coded to the production domain (so a staging-generated badge pointed its logo at production); it now honors the env var like everything else.
 
 ---
 

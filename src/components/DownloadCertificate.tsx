@@ -5,6 +5,7 @@ import { pdf } from '@react-pdf/renderer';
 import QRCode from 'qrcode';
 import { Certificate } from './Certificate';
 import type { WritingMetrics } from '@/lib/types';
+import { getSiteUrl } from '@/lib/site';
 
 interface DownloadCertificateProps {
   title: string;
@@ -30,8 +31,7 @@ export function DownloadCertificate({
     
     try {
       // Generate QR code
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://bymyownhand.com';
-      const verifyUrl = `${siteUrl}/verify/${verificationHash}`;
+      const verifyUrl = `${getSiteUrl()}/verify/${verificationHash}`;
       const qrCodeDataUrl = await QRCode.toDataURL(verifyUrl, {
         width: 200,
         margin: 1,

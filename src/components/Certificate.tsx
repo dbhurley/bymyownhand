@@ -3,6 +3,7 @@
 import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
 import type { WritingMetrics } from '@/lib/types';
 import { formatDuration } from '@/lib/metrics';
+import { getSiteUrl } from '@/lib/site';
 
 // Register fonts
 Font.register({
@@ -198,8 +199,7 @@ export function Certificate({
   certifiedAt,
   qrCodeDataUrl,
 }: CertificateProps) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://bymyownhand.com';
-  const verifyUrl = `${siteUrl}/verify/${verificationHash}`;
+  const verifyUrl = `${getSiteUrl()}/verify/${verificationHash}`;
   const wpm = writingTimeMs > 0 ? Math.round((wordCount / writingTimeMs) * 60000) : 0;
 
   return (

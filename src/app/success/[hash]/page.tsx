@@ -5,6 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import type { WritingSession } from '@/lib/types';
 import { formatDuration, getScoreLabel } from '@/lib/metrics';
+import { getSiteUrl } from '@/lib/site';
 
 const DownloadCertificate = dynamic(
   () => import('@/components/DownloadCertificate').then(mod => mod.DownloadCertificate),
@@ -44,7 +45,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
   const tweetText = `I wrote "${shareTitle}" by my own hand — every keystroke proven human. ${verifyUrl}`;
   const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
   const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(verifyUrl)}`;
-  const embedMarkdown = `[![Verified human-written](https://bymyownhand.com/logo.svg)](${verifyUrl})`;
+  const embedMarkdown = `[![Verified human-written](${getSiteUrl()}/logo.svg)](${verifyUrl})`;
 
   const writingTime = session ? (session.endedAt || Date.now()) - session.startedAt : 0;
   const scoreInfo = session ? getScoreLabel(session.integrityScore || 0) : { label: '', color: '' };
