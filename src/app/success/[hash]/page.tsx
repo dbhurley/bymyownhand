@@ -23,6 +23,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
   const [session, setSession] = useState<SessionData | null>(null);
   const [copied, setCopied] = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
+  const [embedFormat, setEmbedFormat] = useState<'markdown' | 'html'>('markdown');
 
   useEffect(() => {
     const stored = sessionStorage.getItem('lastSession');
@@ -46,6 +47,8 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
   const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
   const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(verifyUrl)}`;
   const embedMarkdown = `[![Verified human-written](${getSiteUrl()}/logo.svg)](${verifyUrl})`;
+  const embedHtml = `<a href="${verifyUrl}" target="_blank" rel="noopener"><img src="${getSiteUrl()}/logo.svg" alt="Verified human-written" width="120" height="auto" /></a>`;
+  const embedSnippet = embedFormat === 'markdown' ? embedMarkdown : embedHtml;
 
   const writingTime = session ? (session.endedAt || Date.now()) - session.startedAt : 0;
   const scoreInfo = session ? getScoreLabel(session.integrityScore || 0) : { label: '', color: '' };
@@ -171,16 +174,40 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
             </a>
           </div>
 
-          <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-3">
-            Embed badge (Markdown)
-          </p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em]">
+              Embed badge
+            </p>
+            <div className="flex items-center gap-1 p-0.5 bg-deep-blue/[0.04] rounded-full" role="tablist" aria-label="Embed format">
+              <button
+                role="tab"
+                aria-selected={embedFormat === 'markdown'}
+                onClick={() => setEmbedFormat('markdown')}
+                className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                  embedFormat === 'markdown' ? 'bg-deep-blue text-cream' : 'text-deep-blue/50 hover:text-deep-blue'
+                }`}
+              >
+                Markdown
+              </button>
+              <button
+                role="tab"
+                aria-selected={embedFormat === 'html'}
+                onClick={() => setEmbedFormat('html')}
+                className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                  embedFormat === 'html' ? 'bg-deep-blue text-cream' : 'text-deep-blue/50 hover:text-deep-blue'
+                }`}
+              >
+                HTML
+              </button>
+            </div>
+          </div>
           <div className="flex items-stretch gap-3">
             <code className="flex-1 px-3 py-2.5 bg-deep-blue/[0.04] rounded-lg text-xs font-mono text-deep-blue/70 overflow-x-auto whitespace-nowrap">
-              {embedMarkdown}
+              {embedSnippet}
             </code>
             <button
               onClick={async () => {
-                await navigator.clipboard.writeText(embedMarkdown);
+                await navigator.clipboard.writeText(embedSnippet);
                 setEmbedCopied(true);
                 setTimeout(() => setEmbedCopied(false), 2000);
               }}
@@ -190,7 +217,9 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
             </button>
           </div>
           <p className="text-xs text-deep-blue/35 mt-3">
-            Paste into Substack, Ghost, Notion, or your README to display a Verified Human badge linking to this proof.
+            {embedFormat === 'markdown'
+              ? 'Markdown works in Substack, Ghost, Notion, and READMEs.'
+              : 'HTML works on WordPress, raw-HTML blocks, and email signatures.'}
           </p>
         </div>
 
@@ -232,6 +261,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
               <Metric label="Thinking Pauses" value={String(session.metrics.pauseCount)} />
               <Metric label="Deletion Rate" value={`${(session.metrics.deletionRate * 100).toFixed(1)}%`} />
               <Metric label="Longest Burst" value={`${session.metrics.longestBurst} chars`} />
+              <Metric label="Avg Word Length" value={`${session.metrics.averageWordLength} chars`} />
               <Metric label="Blocked Pastes" value={String(session.metrics.blockedPastes)} />
             </div>
           </div>

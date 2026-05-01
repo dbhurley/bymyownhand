@@ -1,6 +1,6 @@
 # By My Own Hand — Roadmap
 
-> **Last updated:** 2026-04-30
+> **Last updated:** 2026-05-01
 > Companion to [PRD.md](PRD.md). Items are grouped by phase, not by date — phase boundaries shift with traction signals.
 
 The North Star: **make the act of writing — verifiably and beautifully human — a daily ritual that writers proudly share.**
@@ -35,10 +35,16 @@ The North Star: **make the act of writing — verifiably and beautifully human �
 - ✅ **Server-side 10-word + keystroke-trace gate** in `POST /api/documents` so a direct API call can no longer mint certificates for empty or trace-less documents
 - ✅ **Shared `getScoreLabel()` helper** in `lib/metrics.ts` — collapses two identical copies in `success/[hash]` and `verify/[hash]` into one source of truth (parallels the prior dedupe of `calculateIntegrityScore`)
 
-### Stickiness + fidelity polish (this revision)
+### Stickiness + fidelity polish (prior revision)
 - ✅ **Share + embed surface on `/verify/<hash>`** — Phase 1.5 ☐ item now shipped: cold visitors can copy the proof link, post to X/LinkedIn, or copy the Markdown embed badge directly from the verification page. Removes the second-order friction blocking the embed flywheel.
 - ✅ **Faithful-cased keystroke playback** — playback in `/verify/<hash>` used to reconstruct text from raw key codes, so cased letters always rendered lowercase until the final snap. Playback is now driven positionally from the certified content while keystroke timing still controls the typing/deletion rhythm.
 - ✅ **`getSiteUrl()` helper in `lib/site.ts`** — collapses four duplicated copies of the `NEXT_PUBLIC_SITE_URL` env-var fallback into one source of truth, and fixes the last hard-coded `bymyownhand.com/logo.svg` URL in the success-page embed badge so staging-generated badges no longer point their logo at production.
+
+### Discovery + embed-format polish (this revision)
+- ✅ **Generated `/sitemap.xml` + `/robots.txt`** — `public/robots.txt` had been pointing at a sitemap URL that 404'd, blocking search-engine discovery of the 44+ blog posts. Both are now `app/sitemap.ts` / `app/robots.ts` routes resolved through `getSiteUrl()`, and the sitemap enumerates `/`, `/write`, `/blog`, and every blog post with `lastModified` derived from the post date.
+- ✅ **HTML embed snippet alongside Markdown** — Phase 1.3 step: both `/success` and `/verify/<hash>` now offer a Markdown ↔ HTML toggle for the embed badge, expanding the set of platforms (WordPress, raw-HTML CMSes, email signatures) where writers can plant a "Verified Human" backlink.
+- ✅ **`averageWordLength` surfaced in writing-analysis panels** — the metric was already computed but never displayed; it now shows on both `/success` and `/verify` so the panel reflects every metric we capture.
+- ✅ **No fabricated integrity score for trace-less docs** — `/verify/<hash>` used to default to `integrityScore = 75` when keystroke metrics were missing, painting a confident "Good" cell for documents with no evidence. It now renders an explicit "— / No trace" cell instead.
 
 ---
 
@@ -59,7 +65,8 @@ The current product is single-shot. Phase 1 turns each certified piece into a re
 - *Why it matters:* Converts one-time visitors into named writers with a portfolio they can link to.
 
 ### 1.3 Embeddable "Verified Human" badge — partial
-- ✅ Markdown badge snippet on `/success` (copy-and-paste into Substack, Ghost, Notion, READMEs).
+- ✅ Markdown badge snippet on `/success` and `/verify/<hash>` (copy-and-paste into Substack, Ghost, Notion, READMEs).
+- ✅ HTML badge snippet alongside Markdown (toggle on `/success` + `/verify`) — covers WordPress, raw-HTML CMSes, and email signatures that strip Markdown.
 - ☐ One-line `<script src="https://bymyownhand.com/embed.js" data-hash="bmoh-..." />` snippet that renders a small trust badge linking to the verification page.
 - ☐ `iframe` variant for hosts that strip script tags.
 - *Why it matters:* Every embed is a backlink, a recurring brand impression, and a network effect — the badge in the wild becomes the marketing surface.

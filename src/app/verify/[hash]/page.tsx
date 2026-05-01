@@ -32,6 +32,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   const [playbackProgress, setPlaybackProgress] = useState(0);
   const [copied, setCopied] = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
+  const [embedFormat, setEmbedFormat] = useState<'markdown' | 'html'>('markdown');
   const playbackRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -186,8 +187,14 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   }
 
   const metrics = document.keystrokeData?.metrics;
-  const integrityScore = metrics ? calculateIntegrityScore(metrics, document.wordCount, document.writingTimeMs) : 75;
-  const scoreInfo = getScoreLabel(integrityScore);
+  // Only compute a score when we actually have a keystroke trace to score
+  // against. Falling back to a fabricated number (we used to default to 75)
+  // makes legacy or trace-less documents look confidently certified when
+  // they carry no evidence at all.
+  const integrityScore = metrics
+    ? calculateIntegrityScore(metrics, document.wordCount, document.writingTimeMs)
+    : null;
+  const scoreInfo = integrityScore !== null ? getScoreLabel(integrityScore) : null;
   const wpm = document.writingTimeMs > 0
     ? Math.round((document.wordCount / document.writingTimeMs) * 60000)
     : 0;
@@ -199,6 +206,8 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
   const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(verifyUrl)}`;
   const embedMarkdown = `[![Verified human-written](${getSiteUrl()}/logo.svg)](${verifyUrl})`;
+  const embedHtml = `<a href="${verifyUrl}" target="_blank" rel="noopener"><img src="${getSiteUrl()}/logo.svg" alt="Verified human-written" width="120" height="auto" /></a>`;
+  const embedSnippet = embedFormat === 'markdown' ? embedMarkdown : embedHtml;
 
   const copyVerifyUrl = async () => {
     await navigator.clipboard.writeText(verifyUrl);
@@ -207,7 +216,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   };
 
   const copyEmbed = async () => {
-    await navigator.clipboard.writeText(embedMarkdown);
+    await navigator.clipboard.writeText(embedSnippet);
     setEmbedCopied(true);
     setTimeout(() => setEmbedCopied(false), 2000);
   };
@@ -254,8 +263,17 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
               <div className="text-xs text-deep-blue/35 uppercase tracking-wider">Duration</div>
             </div>
             <div className="bg-white text-center p-5">
-              <div className={`text-2xl font-bold ${scoreInfo.color} mb-0.5`}>{integrityScore}</div>
-              <div className="text-xs text-deep-blue/35 uppercase tracking-wider">{scoreInfo.label}</div>
+              {integrityScore !== null && scoreInfo ? (
+                <>
+                  <div className={`text-2xl font-bold ${scoreInfo.color} mb-0.5`}>{integrityScore}</div>
+                  <div className="text-xs text-deep-blue/35 uppercase tracking-wider">{scoreInfo.label}</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-deep-blue/30 mb-0.5">—</div>
+                  <div className="text-xs text-deep-blue/35 uppercase tracking-wider">No trace</div>
+                </>
+              )}
             </div>
             <div className="bg-white text-center p-5">
               <div className="text-2xl font-bold text-deep-blue mb-0.5">{metrics?.blockedPastes || 0}</div>
@@ -302,6 +320,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
               <MetricItem label="Thinking Pauses" value={String(metrics.pauseCount)} />
               <MetricItem label="Deletion Rate" value={`${(metrics.deletionRate * 100).toFixed(1)}%`} />
               <MetricItem label="Longest Burst" value={`${metrics.longestBurst} chars`} />
+              <MetricItem label="Avg Word Length" value={`${metrics.averageWordLength} chars`} />
               <MetricItem label="WPM" value={String(wpm)} />
             </div>
           </div>
@@ -358,12 +377,36 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
             </a>
           </div>
 
-          <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-3">
-            Embed badge (Markdown)
-          </p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em]">
+              Embed badge
+            </p>
+            <div className="flex items-center gap-1 p-0.5 bg-deep-blue/[0.04] rounded-full" role="tablist" aria-label="Embed format">
+              <button
+                role="tab"
+                aria-selected={embedFormat === 'markdown'}
+                onClick={() => setEmbedFormat('markdown')}
+                className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                  embedFormat === 'markdown' ? 'bg-deep-blue text-cream' : 'text-deep-blue/50 hover:text-deep-blue'
+                }`}
+              >
+                Markdown
+              </button>
+              <button
+                role="tab"
+                aria-selected={embedFormat === 'html'}
+                onClick={() => setEmbedFormat('html')}
+                className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                  embedFormat === 'html' ? 'bg-deep-blue text-cream' : 'text-deep-blue/50 hover:text-deep-blue'
+                }`}
+              >
+                HTML
+              </button>
+            </div>
+          </div>
           <div className="flex items-stretch gap-3">
             <code className="flex-1 px-3 py-2.5 bg-deep-blue/[0.04] rounded-lg text-xs font-mono text-deep-blue/70 overflow-x-auto whitespace-nowrap">
-              {embedMarkdown}
+              {embedSnippet}
             </code>
             <button
               onClick={copyEmbed}
@@ -373,7 +416,9 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
             </button>
           </div>
           <p className="text-xs text-deep-blue/35 mt-3">
-            Paste into Substack, Ghost, Notion, or your README to display a Verified Human badge linking back here.
+            {embedFormat === 'markdown'
+              ? 'Markdown works in Substack, Ghost, Notion, and READMEs.'
+              : 'HTML works on WordPress, raw-HTML blocks, and email signatures.'}
           </p>
         </div>
 

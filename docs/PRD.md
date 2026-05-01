@@ -1,6 +1,6 @@
 # By My Own Hand — Product Requirements Document
 
-> **Last updated:** 2026-04-30
+> **Last updated:** 2026-05-01
 > **Status:** Living document — evolves with the roadmap
 > **Owner:** DB Hurley
 
@@ -106,10 +106,16 @@ Computed at submission time:
 - **Server-side certification gate** — `/api/documents` now rejects submissions with fewer than 10 words *or* an empty keystroke trace. The 10-word minimum was previously enforced only in the client editor, so a direct POST could mint a hash for an empty document.
 - **Shared `getScoreLabel()` helper** — the duplicated label/colour mapping in `success/[hash]` and `verify/[hash]` is now exported from `lib/metrics.ts`, so changes to score thresholds propagate everywhere at once (mirrors the prior dedupe of the integrity-score calculation).
 
-### 6.9 Stickiness + fidelity polish (this revision)
+### 6.9 Stickiness + fidelity polish (prior revision)
 - **Cold-visitor share + embed on `/verify/<hash>`** — the share/embed surface that previously only lived on `/success` is now mirrored on the public verification page, so anyone arriving via a shared link can copy the proof link, post to X/LinkedIn, or grab the Markdown badge to embed. Closes the second-order distribution gap that was blocking the embed flywheel.
 - **Faithful-cased keystroke playback** — the `/verify/<hash>` playback used to reconstruct the document from raw key codes (`KeyH` → `h`), so a piece titled "Hello" played back as "hello" before snapping to the final cased text. Playback is now driven positionally from the certified content while keystroke timings still control the typing/deletion rhythm. Result: the playback matches the document the visitor is verifying, end-to-end.
 - **Single `getSiteUrl()` helper** — the four-times-duplicated `process.env.NEXT_PUBLIC_SITE_URL || 'https://bymyownhand.com'` pattern is collapsed into one helper in `lib/site.ts`. The `/success` embed badge image URL was the last place still hard-coded to the production domain (so a staging-generated badge pointed its logo at production); it now honors the env var like everything else.
+
+### 6.10 Discovery + embed-format polish (this revision)
+- **Real `/sitemap.xml` and `/robots.txt` routes** — `public/robots.txt` had been pointing at a `/sitemap.xml` URL that 404'd, so search engines couldn't discover the 44+ blog posts or the marketing surfaces. Both are now generated from `app/sitemap.ts` and `app/robots.ts`, resolved through `getSiteUrl()`, and the sitemap enumerates `/`, `/write`, `/blog`, and every blog post with appropriate `lastModified` and `changeFrequency` hints. Discovery surface for the cross-cutting "Documentation" investment in the roadmap.
+- **HTML embed snippet alongside Markdown** — Phase 1.3 (Embeddable badge) now ships a Markdown ↔ HTML toggle on both `/success` and `/verify/<hash>`. WordPress, raw-HTML CMSes, and email signatures accept HTML but strip Markdown; a single-toggle UX widens the set of platforms where the embed flywheel can take root before the full `embed.js` and `iframe` variants ship.
+- **Surface `averageWordLength` in writing-analysis panels** — the metric was already computed (§6.7) but never displayed; it's now shown on both `/success/<hash>` and `/verify/<hash>` so the panel reflects all the data we actually capture.
+- **Drop the fabricated `integrityScore = 75` fallback on `/verify/<hash>`** — for a document with no keystroke trace (legacy, or trace stripped) the verify page used to render a confident-looking "75 / Good" score. It now renders an explicit "— / No trace" cell so a verifier can never mistake silence for evidence.
 
 ---
 
