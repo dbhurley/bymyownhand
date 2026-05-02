@@ -1,6 +1,6 @@
 # By My Own Hand — Roadmap
 
-> **Last updated:** 2026-05-01
+> **Last updated:** 2026-05-02
 > Companion to [PRD.md](PRD.md). Items are grouped by phase, not by date — phase boundaries shift with traction signals.
 
 The North Star: **make the act of writing — verifiably and beautifully human — a daily ritual that writers proudly share.**
@@ -40,11 +40,17 @@ The North Star: **make the act of writing — verifiably and beautifully human �
 - ✅ **Faithful-cased keystroke playback** — playback in `/verify/<hash>` used to reconstruct text from raw key codes, so cased letters always rendered lowercase until the final snap. Playback is now driven positionally from the certified content while keystroke timing still controls the typing/deletion rhythm.
 - ✅ **`getSiteUrl()` helper in `lib/site.ts`** — collapses four duplicated copies of the `NEXT_PUBLIC_SITE_URL` env-var fallback into one source of truth, and fixes the last hard-coded `bymyownhand.com/logo.svg` URL in the success-page embed badge so staging-generated badges no longer point their logo at production.
 
-### Discovery + embed-format polish (this revision)
+### Discovery + embed-format polish (prior revision)
 - ✅ **Generated `/sitemap.xml` + `/robots.txt`** — `public/robots.txt` had been pointing at a sitemap URL that 404'd, blocking search-engine discovery of the 44+ blog posts. Both are now `app/sitemap.ts` / `app/robots.ts` routes resolved through `getSiteUrl()`, and the sitemap enumerates `/`, `/write`, `/blog`, and every blog post with `lastModified` derived from the post date.
 - ✅ **HTML embed snippet alongside Markdown** — Phase 1.3 step: both `/success` and `/verify/<hash>` now offer a Markdown ↔ HTML toggle for the embed badge, expanding the set of platforms (WordPress, raw-HTML CMSes, email signatures) where writers can plant a "Verified Human" backlink.
 - ✅ **`averageWordLength` surfaced in writing-analysis panels** — the metric was already computed but never displayed; it now shows on both `/success` and `/verify` so the panel reflects every metric we capture.
 - ✅ **No fabricated integrity score for trace-less docs** — `/verify/<hash>` used to default to `integrityScore = 75` when keystroke metrics were missing, painting a confident "Good" cell for documents with no evidence. It now renders an explicit "— / No trace" cell instead.
+
+### Performance + API + embed-validity polish (this revision)
+- ✅ **Memoized `getAllPosts()`** — `lib/blog.ts` now caches the parsed post list in module scope, so sitemap, JSON Feed, blog index, post pages, related-posts, categories, and tags all share one filesystem read + markdown-parse pass per server lifetime instead of per-call. Materially cuts cold-start work for `/blog`, `/blog/<slug>`, and `/sitemap.xml`.
+- ✅ **`POST /api/documents` returns an absolute `verifyUrl`** — the response previously emitted `/verify/<hash>` (relative). External API consumers (Phase 2.1) need a full URL; the in-app web client constructs its own from `window.location.origin`, so this change costs the client nothing and gets the response shape aligned with the documented public-API contract before that phase ships.
+- ✅ **Valid `height` on the HTML embed badge** — replaced the invalid `<img height="auto" />` (HTML attribute requires a non-negative integer; stricter CMS sanitizers strip the attribute entirely) with a numeric `height="107"` derived from the logo's intrinsic `363×324` aspect ratio at `width="120"`. The HTML embed flow now passes validators on the platforms it's meant to land on (WordPress, raw-HTML CMSes, email signatures).
+- ✅ **Sitemap `/blog` `lastModified` tracks the latest post date** — the blog index was advertising `now` to crawlers on every request, which is a freshness lie that wastes crawl budget. The entry now anchors to the most-recent post's date so the index gets re-fetched only when actual content changes.
 
 ---
 

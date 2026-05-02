@@ -47,7 +47,10 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
   const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
   const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(verifyUrl)}`;
   const embedMarkdown = `[![Verified human-written](${getSiteUrl()}/logo.svg)](${verifyUrl})`;
-  const embedHtml = `<a href="${verifyUrl}" target="_blank" rel="noopener"><img src="${getSiteUrl()}/logo.svg" alt="Verified human-written" width="120" height="auto" /></a>`;
+  // HTML's `height` attribute requires a non-negative integer (CSS pixels);
+  // `height="auto"` is invalid and gets stripped by stricter CMS sanitizers.
+  // The logo is 363×324, so width=120 → height=107 keeps the aspect ratio.
+  const embedHtml = `<a href="${verifyUrl}" target="_blank" rel="noopener"><img src="${getSiteUrl()}/logo.svg" alt="Verified human-written" width="120" height="107" /></a>`;
   const embedSnippet = embedFormat === 'markdown' ? embedMarkdown : embedHtml;
 
   const writingTime = session ? (session.endedAt || Date.now()) - session.startedAt : 0;

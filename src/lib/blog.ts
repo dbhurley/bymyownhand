@@ -133,11 +133,20 @@ function parsePost(filename: string): BlogPost | null {
   }
 }
 
+// Memoized in module scope. Blog posts are markdown files on disk that don't
+// change at runtime, but `getAllPosts()` is called from sitemap, feed,
+// categories, tags, related-posts, and both blog pages — without caching, a
+// single `/blog/[slug]` render re-reads and re-parses all 44+ posts several
+// times. Module-scope cache makes subsequent calls free.
+let cachedPosts: BlogPost[] | null = null;
+
 export function getAllPosts(): BlogPost[] {
+  if (cachedPosts) return cachedPosts;
   if (!fs.existsSync(BLOG_DIR)) return [];
   const files = fs.readdirSync(BLOG_DIR).filter(f => f.endsWith('.md') && f !== 'README.md');
   const posts = files.map(parsePost).filter((p): p is BlogPost => p !== null);
   posts.sort((a, b) => b.date.localeCompare(a.date));
+  cachedPosts = posts;
   return posts;
 }
 

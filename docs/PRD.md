@@ -1,6 +1,6 @@
 # By My Own Hand — Product Requirements Document
 
-> **Last updated:** 2026-05-01
+> **Last updated:** 2026-05-02
 > **Status:** Living document — evolves with the roadmap
 > **Owner:** DB Hurley
 
@@ -111,11 +111,17 @@ Computed at submission time:
 - **Faithful-cased keystroke playback** — the `/verify/<hash>` playback used to reconstruct the document from raw key codes (`KeyH` → `h`), so a piece titled "Hello" played back as "hello" before snapping to the final cased text. Playback is now driven positionally from the certified content while keystroke timings still control the typing/deletion rhythm. Result: the playback matches the document the visitor is verifying, end-to-end.
 - **Single `getSiteUrl()` helper** — the four-times-duplicated `process.env.NEXT_PUBLIC_SITE_URL || 'https://bymyownhand.com'` pattern is collapsed into one helper in `lib/site.ts`. The `/success` embed badge image URL was the last place still hard-coded to the production domain (so a staging-generated badge pointed its logo at production); it now honors the env var like everything else.
 
-### 6.10 Discovery + embed-format polish (this revision)
+### 6.10 Discovery + embed-format polish (prior revision)
 - **Real `/sitemap.xml` and `/robots.txt` routes** — `public/robots.txt` had been pointing at a `/sitemap.xml` URL that 404'd, so search engines couldn't discover the 44+ blog posts or the marketing surfaces. Both are now generated from `app/sitemap.ts` and `app/robots.ts`, resolved through `getSiteUrl()`, and the sitemap enumerates `/`, `/write`, `/blog`, and every blog post with appropriate `lastModified` and `changeFrequency` hints. Discovery surface for the cross-cutting "Documentation" investment in the roadmap.
 - **HTML embed snippet alongside Markdown** — Phase 1.3 (Embeddable badge) now ships a Markdown ↔ HTML toggle on both `/success` and `/verify/<hash>`. WordPress, raw-HTML CMSes, and email signatures accept HTML but strip Markdown; a single-toggle UX widens the set of platforms where the embed flywheel can take root before the full `embed.js` and `iframe` variants ship.
 - **Surface `averageWordLength` in writing-analysis panels** — the metric was already computed (§6.7) but never displayed; it's now shown on both `/success/<hash>` and `/verify/<hash>` so the panel reflects all the data we actually capture.
 - **Drop the fabricated `integrityScore = 75` fallback on `/verify/<hash>`** — for a document with no keystroke trace (legacy, or trace stripped) the verify page used to render a confident-looking "75 / Good" score. It now renders an explicit "— / No trace" cell so a verifier can never mistake silence for evidence.
+
+### 6.11 Performance + API + embed-validity polish (this revision)
+- **Memoize `getAllPosts()` in `lib/blog.ts`** — `getAllPosts()` is the single source for sitemap, JSON Feed, blog index, individual posts, related-posts, categories, and tags. Each call re-read all 44+ markdown files from disk and re-ran `marked` over them; a single render of `/blog/<slug>` was triggering this work several times. A module-scope cache makes the first call canonical and every subsequent call free, materially reducing cold-start work for the blog index, the post page, and the sitemap that ships every certified URL to search engines.
+- **Absolute `verifyUrl` from `POST /api/documents`** — the create-document endpoint returned a relative `/verify/<hash>` URL, which the in-app web client doesn't use (it constructs its own from `window.location.origin`). External API consumers (Phase 2.1) need a full URL they can share unmodified. The route now returns `${getSiteUrl()}/verify/<hash>` so the shape matches the documented Phase 2.1 contract before the public API ships.
+- **Valid `height` on the HTML embed snippet** — the HTML badge snippet on `/success` and `/verify/<hash>` rendered `<img ... height="auto" />`. HTML's `height` attribute requires a non-negative integer; `"auto"` is invalid and gets stripped by stricter CMS sanitizers (and tarnishes any HTML-validator scan a publisher might run on the post). Replaced with a real numeric height (`107`, computed from the `363×324` logo at `width=120`) so the badge renders cleanly across every embed target the toggle is meant to support.
+- **Sitemap `/blog` `lastModified` anchored to the latest post date** — the blog index entry was emitting `lastModified: new Date()` on every crawl, which is a freshness lie: the page never changes between posts. Search engines re-spent crawl budget on a static index instead of on the new posts they'd actually discover. The entry now uses the most-recent post's date so the index's freshness signal tracks real content changes.
 
 ---
 

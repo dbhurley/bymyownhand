@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
 import { generateVerificationHash } from '@/lib/hash';
 import { createDocument } from '@/lib/db';
+import { getSiteUrl } from '@/lib/site';
 import type { WritingSession } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
@@ -63,11 +64,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Return an absolute verifyUrl so external API consumers (Phase 2.1) can
+    // share the proof link as-is without needing to know the host. The web
+    // client (which already lives on the same origin) handles either form.
     return NextResponse.json({
       success: true,
       documentId: docId,
       verificationHash,
-      verifyUrl: `/verify/${verificationHash}`,
+      verifyUrl: `${getSiteUrl()}/verify/${verificationHash}`,
     });
   } catch (error) {
     console.error('Error creating document:', error);
