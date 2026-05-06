@@ -111,6 +111,21 @@ export default function BlogPage() {
               </div>
             </Link>
           </div>
+        
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: `{"@context": "https://schema.org","@type": "Organization","name": "By My Own Hand","url": "https://bymyownhand.com","logo": "https://bymyownhand.com/images/logo.png"}` }}
+      />
+        
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: `{"@context": "https://schema.org","@type": "WebSite","name": "By My Own Hand Blog","url": "https://bymyownhand.com/blog","potentialAction": {"@type": "SearchAction","target": "https://bymyownhand.com/blog?s={search_term_string}","query-input": "required name=search_term_string"}}` }}
+      />
+        
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: `{"@context": "https://schema.org","@type": "Article","headline": "Blog | By My Own Hand | By My Own Hand","description": "Insights on human authenticity, writing verification, identity, and the future of trust in a world o...","image": "https://bymyownhand.com/images/logo.png","datePublished": "2024-01-01T00:00:00+00:00","dateModified": "2024-01-01T00:00:00+00:00","author": {"@type": "Organization","name": "By My Own Hand"},"publisher": {"@type": "Organization","name": "By My Own Hand","logo": {"@type": "ImageObject","url": "https://bymyownhand.com/images/logo.png"}}}` }}
+      />
         </section>
       )}
 
