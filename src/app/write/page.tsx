@@ -98,6 +98,80 @@ export default function WritePage() {
             <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-100 rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
               <span className="text-xs text-red-600">{error}</span>
+            
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: `{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "By My Own Hand",
+  "url": "https://bymyownhand.com",
+  "logo": "https://bymyownhand.com/images/logo.png" 
+}` }}
+      />
+            
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: `{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "By My Own Hand",
+  "url": "https://bymyownhand.com",
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": "https://bymyownhand.com/?s={search_term_string}",
+    "query-input": "required name=search_term_string"
+  }
+}` }}
+      />
+            
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: `{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Prove Your Writing is Human",
+  "description": "Certify your writing was created by your own hands. Block AI, capture keystrokes, prove authenticity...",
+  "image": "https://bymyownhand.com/images/logo.png",
+  "datePublished": "2024-01-01T00:00:00+00:00",
+  "dateModified": "2024-01-01T00:00:00+00:00",
+  "author": {
+    "@type": "Organization",
+    "name": "By My Own Hand"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "By My Own Hand",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://bymyownhand.com/images/logo.png"
+    }
+  }
+}` }}
+      />
+            
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: `{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [{
+    "@type": "Question",
+    "name": "Why is it important to prove my writing is human?",
+    "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "It helps to maintain authenticity and originality in a world increasingly influenced by AI-generated content."
+    }
+  },{
+    "@type": "Question",
+    "name": "How does By My Own Hand help prove my writing is human?",
+    "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "By capturing keystrokes and analyzing writing patterns, By My Own Hand provides evidence that your writing is genuinely your own."
+    }
+  }]
+}` }}
+      />
             </div>
           )}
           {isSubmitting && (
