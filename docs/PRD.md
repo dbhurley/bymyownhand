@@ -1,6 +1,6 @@
 # By My Own Hand — Product Requirements Document
 
-> **Last updated:** 2026-05-02
+> **Last updated:** 2026-05-06
 > **Status:** Living document — evolves with the roadmap
 > **Owner:** DB Hurley
 
@@ -117,11 +117,16 @@ Computed at submission time:
 - **Surface `averageWordLength` in writing-analysis panels** — the metric was already computed (§6.7) but never displayed; it's now shown on both `/success/<hash>` and `/verify/<hash>` so the panel reflects all the data we actually capture.
 - **Drop the fabricated `integrityScore = 75` fallback on `/verify/<hash>`** — for a document with no keystroke trace (legacy, or trace stripped) the verify page used to render a confident-looking "75 / Good" score. It now renders an explicit "— / No trace" cell so a verifier can never mistake silence for evidence.
 
-### 6.11 Performance + API + embed-validity polish (this revision)
+### 6.11 Performance + API + embed-validity polish (prior revision)
 - **Memoize `getAllPosts()` in `lib/blog.ts`** — `getAllPosts()` is the single source for sitemap, JSON Feed, blog index, individual posts, related-posts, categories, and tags. Each call re-read all 44+ markdown files from disk and re-ran `marked` over them; a single render of `/blog/<slug>` was triggering this work several times. A module-scope cache makes the first call canonical and every subsequent call free, materially reducing cold-start work for the blog index, the post page, and the sitemap that ships every certified URL to search engines.
 - **Absolute `verifyUrl` from `POST /api/documents`** — the create-document endpoint returned a relative `/verify/<hash>` URL, which the in-app web client doesn't use (it constructs its own from `window.location.origin`). External API consumers (Phase 2.1) need a full URL they can share unmodified. The route now returns `${getSiteUrl()}/verify/<hash>` so the shape matches the documented Phase 2.1 contract before the public API ships.
 - **Valid `height` on the HTML embed snippet** — the HTML badge snippet on `/success` and `/verify/<hash>` rendered `<img ... height="auto" />`. HTML's `height` attribute requires a non-negative integer; `"auto"` is invalid and gets stripped by stricter CMS sanitizers (and tarnishes any HTML-validator scan a publisher might run on the post). Replaced with a real numeric height (`107`, computed from the `363×324` logo at `width=120`) so the badge renders cleanly across every embed target the toggle is meant to support.
 - **Sitemap `/blog` `lastModified` anchored to the latest post date** — the blog index entry was emitting `lastModified: new Date()` on every crawl, which is a freshness lie: the page never changes between posts. Search engines re-spent crawl budget on a static index instead of on the new posts they'd actually discover. The entry now uses the most-recent post's date so the index's freshness signal tracks real content changes.
+
+### 6.12 Habit-loop + drift-prevention polish (this revision)
+- **Local-first writing streak on `/success/<hash>`** — first surface for Phase 1.4 (Writing streaks) before the optional accounts in Phase 1.2 land. A new `lib/history.ts` records each certification (hash, ts, word count, score) into `localStorage`; the success page reads back the total count and the consecutive-day streak and renders a calm pill — *"3 certified pieces · 2-day streak"* — directly under the "Document Certified" header. Recording is idempotent on hash, so revisits don't double-count. Same staged-rollout pattern as Phase 1.3 (Markdown badge first, full `embed.js` later): we start the habit-formation feedback loop on day one and migrate to a server-synced shape when accounts ship.
+- **Single `buildEmbedSnippets(verifyUrl)` helper in `lib/embed.ts`** — the markdown + HTML embed-badge snippets were defined inline in *both* `success/[hash]` and `verify/[hash]` with the same `width=120, height=107` aspect-ratio comment in each copy. A future tweak (alt-text wording, query-string tracking, a v2 logo URL) had two places to drift from. The snippet generator now lives in one helper, mirroring the prior `getScoreLabel` / `getSiteUrl` consolidations. Drift-prevention before the script-tag and iframe variants land in Phase 1.3.
+- **Defensive blog-date handling in `sitemap.ts` and `feed.json`** — posts with a missing or unparseable `date` used to fall through into the sitemap with `lastModified=now` (the same freshness-lie pattern §6.11 just fixed for `/blog`) and into the JSON Feed with a literal `"T00:00:00Z"` `date_published` (which most feed validators reject — a bad signal for Phase 4.1's opt-in feed work and any partner ingesting the feed). Both routes now skip such posts entirely rather than emit a misleading entry. Today's content corpus all parses cleanly; the change protects discovery surface against a future post landing without a date in frontmatter.
 
 ---
 
@@ -141,7 +146,7 @@ The platform is currently a single-shot tool: write once, share once, leave. To 
 
 1. **A persistent author identity** — optional accounts so writers can collect their certified pieces in one shareable profile.
 2. **Embeddable verification badges** — a one-line `<script>` writers paste on Substack, Ghost, personal sites — every certified piece on the open web becomes a backlink and a brand impression. *(Phase 1.3, partially live: the success page now ships a copyable Markdown badge.)*
-3. **Writing streaks & habits** — gamified "7-day human-written streak" emails turn the certifier into a daily writing ritual.
+3. **Writing streaks & habits** — gamified "7-day human-written streak" emails turn the certifier into a daily writing ritual. *(Phase 1.4, partially live: `/success/<hash>` now shows total certifications and the consecutive-day streak from `localStorage`.)*
 4. **Saved drafts** — `localStorage`-backed in-progress drafts so a closed tab doesn't lose work. *(Shipped in this revision.)*
 5. **Native social distribution** — one-click "Post on X" / "Share on LinkedIn" actions auto-write the proof copy so sharing happens inside the success flow. *(Shipped in this revision.)*
 6. **API + integrations** — a public API for educators, hiring platforms, and CMS plugins (WordPress, Ghost, Substack) so verification happens where writers already work.

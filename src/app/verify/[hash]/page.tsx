@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { WritingMetrics, KeystrokeEvent } from '@/lib/types';
 import { calculateIntegrityScore, formatDuration, getScoreLabel } from '@/lib/metrics';
 import { getSiteUrl } from '@/lib/site';
+import { buildEmbedSnippets } from '@/lib/embed';
 
 interface DocumentData {
   id: string;
@@ -205,12 +206,8 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   const tweetText = `"${document.title}" was written by hand — every keystroke proven human. ${verifyUrl}`;
   const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
   const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(verifyUrl)}`;
-  const embedMarkdown = `[![Verified human-written](${getSiteUrl()}/logo.svg)](${verifyUrl})`;
-  // HTML's `height` attribute requires a non-negative integer (CSS pixels);
-  // `height="auto"` is invalid and gets stripped by stricter CMS sanitizers.
-  // The logo is 363×324, so width=120 → height=107 keeps the aspect ratio.
-  const embedHtml = `<a href="${verifyUrl}" target="_blank" rel="noopener"><img src="${getSiteUrl()}/logo.svg" alt="Verified human-written" width="120" height="107" /></a>`;
-  const embedSnippet = embedFormat === 'markdown' ? embedMarkdown : embedHtml;
+  const embeds = buildEmbedSnippets(verifyUrl);
+  const embedSnippet = embedFormat === 'markdown' ? embeds.markdown : embeds.html;
 
   const copyVerifyUrl = async () => {
     await navigator.clipboard.writeText(verifyUrl);

@@ -6,6 +6,26 @@ export async function GET() {
   const posts = getAllPosts();
   const siteUrl = getSiteUrl();
 
+  // JSON Feed 1.1 requires `date_published` to be RFC 3339. Posts without a
+  // valid date used to emit a literal `"T00:00:00Z"` (no date prefix) which
+  // most feed validators reject. Skip those entries instead of emitting a
+  // malformed timestamp.
+  const items = posts.flatMap(post => {
+    if (!post.date) return [];
+    const parsed = new Date(`${post.date}T00:00:00Z`);
+    if (isNaN(parsed.getTime())) return [];
+    return [{
+      id: `${siteUrl}/blog/${post.slug}`,
+      url: `${siteUrl}/blog/${post.slug}`,
+      title: post.title,
+      content_html: post.content,
+      summary: post.excerpt,
+      date_published: parsed.toISOString(),
+      tags: post.tags,
+      authors: [{ name: 'By My Own Hand' }],
+    }];
+  });
+
   const feed = {
     version: 'https://jsonfeed.org/version/1.1',
     title: 'By My Own Hand Blog',
@@ -13,16 +33,7 @@ export async function GET() {
     feed_url: `${siteUrl}/api/blog/feed.json`,
     description: 'Insights on human authenticity, writing verification, and identity in the age of AI.',
     language: 'en-US',
-    items: posts.map(post => ({
-      id: `${siteUrl}/blog/${post.slug}`,
-      url: `${siteUrl}/blog/${post.slug}`,
-      title: post.title,
-      content_html: post.content,
-      summary: post.excerpt,
-      date_published: `${post.date}T00:00:00Z`,
-      tags: post.tags,
-      authors: [{ name: 'By My Own Hand' }],
-    })),
+    items,
   };
 
   return NextResponse.json(feed, {

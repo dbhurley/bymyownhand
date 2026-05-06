@@ -5,7 +5,8 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import type { WritingSession } from '@/lib/types';
 import { formatDuration, getScoreLabel } from '@/lib/metrics';
-import { getSiteUrl } from '@/lib/site';
+import { buildEmbedSnippets } from '@/lib/embed';
+import { recordCertification, type StreakSummary } from '@/lib/history';
 
 const DownloadCertificate = dynamic(
   () => import('@/components/DownloadCertificate').then(mod => mod.DownloadCertificate),
@@ -24,11 +25,23 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
   const [copied, setCopied] = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
   const [embedFormat, setEmbedFormat] = useState<'markdown' | 'html'>('markdown');
+  const [streakSummary, setStreakSummary] = useState<StreakSummary | null>(null);
 
   useEffect(() => {
     const stored = sessionStorage.getItem('lastSession');
-    if (stored) {
-      setSession(JSON.parse(stored));
+    if (!stored) return;
+    const parsed: SessionData = JSON.parse(stored);
+    setSession(parsed);
+    // Record this certification once (idempotent on hash) and surface the
+    // resulting streak/total so the writer sees their habit forming.
+    if (parsed.verificationHash) {
+      const summary = recordCertification({
+        hash: parsed.verificationHash,
+        certifiedAt: parsed.endedAt || Date.now(),
+        wordCount: parsed.wordCount || 0,
+        integrityScore: parsed.integrityScore || 0,
+      });
+      setStreakSummary(summary);
     }
   }, []);
 
@@ -46,12 +59,8 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
   const tweetText = `I wrote "${shareTitle}" by my own hand — every keystroke proven human. ${verifyUrl}`;
   const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
   const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(verifyUrl)}`;
-  const embedMarkdown = `[![Verified human-written](${getSiteUrl()}/logo.svg)](${verifyUrl})`;
-  // HTML's `height` attribute requires a non-negative integer (CSS pixels);
-  // `height="auto"` is invalid and gets stripped by stricter CMS sanitizers.
-  // The logo is 363×324, so width=120 → height=107 keeps the aspect ratio.
-  const embedHtml = `<a href="${verifyUrl}" target="_blank" rel="noopener"><img src="${getSiteUrl()}/logo.svg" alt="Verified human-written" width="120" height="107" /></a>`;
-  const embedSnippet = embedFormat === 'markdown' ? embedMarkdown : embedHtml;
+  const embeds = buildEmbedSnippets(verifyUrl);
+  const embedSnippet = embedFormat === 'markdown' ? embeds.markdown : embeds.html;
 
   const writingTime = session ? (session.endedAt || Date.now()) - session.startedAt : 0;
   const scoreInfo = session ? getScoreLabel(session.integrityScore || 0) : { label: '', color: '' };
@@ -80,6 +89,21 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
           <p className="text-deep-blue/50">
             Your writing has been verified as authentically human.
           </p>
+          {streakSummary && streakSummary.total > 0 && (
+            <div className="mt-6 inline-flex items-center gap-3 px-4 py-2 bg-white border border-deep-blue/[0.08] rounded-full text-sm">
+              <span className="text-deep-blue/70">
+                <span className="font-semibold text-deep-blue">{streakSummary.total}</span> certified piece{streakSummary.total === 1 ? '' : 's'}
+              </span>
+              {streakSummary.streak > 1 && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-deep-blue/20" />
+                  <span className="text-deep-blue/70">
+                    <span className="font-semibold text-deep-blue">{streakSummary.streak}</span>-day streak
+                  </span>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Document info */}

@@ -27,14 +27,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/blog`, lastModified: blogLastModified, changeFrequency: 'weekly', priority: 0.8 },
   ];
 
-  const postEntries: MetadataRoute.Sitemap = posts.map(post => {
-    const lastModified = post.date ? new Date(post.date) : now;
-    return {
+  // Skip posts whose date is missing or unparseable rather than advertising
+  // `lastModified=now` for them. That fallback is the same freshness lie we
+  // just fixed for `/blog`: it spends crawl budget on a page whose content
+  // didn't actually change. Better to omit the entry than to mislead crawlers.
+  const postEntries: MetadataRoute.Sitemap = posts.flatMap(post => {
+    if (!post.date) return [];
+    const lastModified = new Date(post.date);
+    if (isNaN(lastModified.getTime())) return [];
+    return [{
       url: `${base}/blog/${post.slug}`,
-      lastModified: isNaN(lastModified.getTime()) ? now : lastModified,
-      changeFrequency: 'yearly',
+      lastModified,
+      changeFrequency: 'yearly' as const,
       priority: 0.6,
-    };
+    }];
   });
 
   return [...staticEntries, ...postEntries];
