@@ -67,17 +67,16 @@ function summarize(history: CertificationRecord[]): StreakSummary {
   if (total === 0) return { total: 0, streak: 0 };
 
   const days = new Set(history.map(r => dayKey(r.certifiedAt)));
-  const today = new Date();
+  const today = startOfDay(new Date());
   // Allow today OR yesterday as the anchor: someone who certified yesterday
   // but not yet today still has an active streak as of right now.
-  const todayKey = dayKey(today.getTime());
-  const yesterdayKey = dayKey(today.getTime() - 24 * 60 * 60 * 1000);
+  const yesterday = addDays(today, -1);
 
   let cursor: Date;
-  if (days.has(todayKey)) {
-    cursor = startOfDay(today);
-  } else if (days.has(yesterdayKey)) {
-    cursor = startOfDay(new Date(today.getTime() - 24 * 60 * 60 * 1000));
+  if (days.has(dayKey(today.getTime()))) {
+    cursor = today;
+  } else if (days.has(dayKey(yesterday.getTime()))) {
+    cursor = yesterday;
   } else {
     return { total, streak: 0 };
   }
@@ -85,13 +84,24 @@ function summarize(history: CertificationRecord[]): StreakSummary {
   let streak = 0;
   while (days.has(dayKey(cursor.getTime()))) {
     streak++;
-    cursor = new Date(cursor.getTime() - 24 * 60 * 60 * 1000);
+    cursor = addDays(cursor, -1);
   }
   return { total, streak };
 }
 
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+// Day arithmetic via Date.setDate() instead of subtracting 24*60*60*1000.
+// Across DST transitions a calendar day is 23h or 25h; subtracting a fixed
+// 24h offset can land on the same calendar day (skipping the boundary day)
+// or two days back, miscounting the streak. setDate() always moves by one
+// calendar day in the local timezone, which is what dayKey() compares.
+function addDays(d: Date, delta: number): Date {
+  const out = new Date(d);
+  out.setDate(out.getDate() + delta);
+  return out;
 }
 
 function dayKey(ms: number): string {

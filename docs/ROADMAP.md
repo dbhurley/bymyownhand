@@ -1,6 +1,6 @@
 # By My Own Hand — Roadmap
 
-> **Last updated:** 2026-05-06
+> **Last updated:** 2026-05-07
 > Companion to [PRD.md](PRD.md). Items are grouped by phase, not by date — phase boundaries shift with traction signals.
 
 The North Star: **make the act of writing — verifiably and beautifully human — a daily ritual that writers proudly share.**
@@ -52,10 +52,15 @@ The North Star: **make the act of writing — verifiably and beautifully human �
 - ✅ **Valid `height` on the HTML embed badge** — replaced the invalid `<img height="auto" />` (HTML attribute requires a non-negative integer; stricter CMS sanitizers strip the attribute entirely) with a numeric `height="107"` derived from the logo's intrinsic `363×324` aspect ratio at `width="120"`. The HTML embed flow now passes validators on the platforms it's meant to land on (WordPress, raw-HTML CMSes, email signatures).
 - ✅ **Sitemap `/blog` `lastModified` tracks the latest post date** — the blog index was advertising `now` to crawlers on every request, which is a freshness lie that wastes crawl budget. The entry now anchors to the most-recent post's date so the index gets re-fetched only when actual content changes.
 
-### Habit-loop + drift-prevention polish (this revision)
+### Habit-loop + drift-prevention polish (prior revision)
 - ✅ **Local-first writing streak on `/success/<hash>`** — first surface for Phase 1.4 (Writing streaks) before optional accounts ship. New `lib/history.ts` records each certification to `localStorage` and computes the consecutive-day streak; the success page renders a *"N certified pieces · K-day streak"* pill under the confirmation header. Recording is idempotent on hash, so a revisit never double-counts. Same staged-rollout shape as Phase 1.3 (Markdown badge first → `embed.js` later): start the habit-formation feedback loop today, migrate to a server-synced shape when accounts land in Phase 1.2.
 - ✅ **Shared `buildEmbedSnippets(verifyUrl)` helper in `lib/embed.ts`** — the markdown + HTML embed snippets and the aspect-ratio comment lived inline in both `success/[hash]` and `verify/[hash]`. The snippet generator now lives in one helper (parallels the prior `getScoreLabel` / `getSiteUrl` consolidations), so a tweak — alt-text wording, query-string tracking, v2 logo URL — only has to land once. Drift-prevention before the `embed.js` and `iframe` variants land.
 - ✅ **Defensive blog-date handling in sitemap + JSON Feed** — posts with a missing or unparseable `date` used to leak into the sitemap with `lastModified=now` (the freshness lie this prior revision had just fixed for `/blog`) and into the JSON Feed with a literal `"T00:00:00Z"` `date_published` (which most feed validators reject). Both routes now skip such entries rather than emit a misleading one — protecting discovery surface against a future post landing without a frontmatter date.
+
+### Streak-correctness + caching + drift-prevention polish (this revision)
+- ✅ **DST-safe streak day arithmetic in `lib/history.ts`** — the streak walker subtracted a fixed `24 * 60 * 60 * 1000` ms to step a calendar day backward, which goes wrong across DST transitions (a calendar day is 23h or 25h, not 24h). The Phase 1.4 streak counter would have undercounted or overcounted exactly once a year for any writer with an active streak across spring-forward / fall-back. Day arithmetic now goes through a `setDate()`-based `addDays()` helper that moves by one local calendar day — the same unit `dayKey()` compares.
+- ✅ **`Cache-Control` on `GET /api/documents/[hash]` for found documents** — a certified document is immutable, but every cold-visitor verify pageload (the embed flywheel target) and every external Phase 2.1 API consumer was round-tripping Neon for the same payload. The route now sets `public, max-age=300, s-maxage=86400, stale-while-revalidate=86400` on found responses so Vercel's edge absorbs the load. 404s remain uncached so a revoked-or-not-yet-created hash never gets stuck.
+- ✅ **Single `countWords()` / `splitWords()` helper in `lib/metrics.ts`** — the `content.trim().split(/\s+/).filter(Boolean)` regex was duplicated five times across the editor's live counter, the resume-banner word summary, the API submission gate, the `averageWordLength` calculator, and the metrics path. The 10-word certification gate is exactly the kind of rule the client editor and server submission check must never silently disagree on; consolidating into one helper kills the drift surface (mirrors the prior `getScoreLabel` / `getSiteUrl` / `buildEmbedSnippets` consolidations).
 
 ---
 

@@ -3,7 +3,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
 import type { KeystrokeEvent, WritingSession } from '@/lib/types';
-import { calculateMetrics, calculateIntegrityScore, formatDuration } from '@/lib/metrics';
+import { calculateMetrics, calculateIntegrityScore, countWords, formatDuration } from '@/lib/metrics';
 import { DRAFT_STORAGE_KEY, type DraftSnapshot } from '@/lib/draft';
 import { nanoid } from 'nanoid';
 
@@ -37,8 +37,7 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
 
   // Calculate word count
   useEffect(() => {
-    const words = content.trim().split(/\s+/).filter(w => w.length > 0);
-    setWordCount(words.length);
+    setWordCount(countWords(content));
   }, [content]);
 
   const recordEvent = useCallback((event: Omit<KeystrokeEvent, 't'>) => {

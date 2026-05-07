@@ -20,6 +20,12 @@ export async function GET(
       try {
         const document = await getDocumentByHash(hash);
         if (document) {
+          // A certified document is immutable — its hash, content, and
+          // keystroke trace never change after `certified_at`. Advertise a
+          // long-lived cache so cold-visitor verify pageloads (the embed
+          // flywheel target) and external API consumers (Phase 2.1) don't
+          // re-hit Neon for each view. `s-maxage` lets Vercel's edge cache
+          // it; `stale-while-revalidate` keeps it fresh without blocking.
           return NextResponse.json({
             success: true,
             document: {
@@ -34,6 +40,10 @@ export async function GET(
               certifiedAt: document.certified_at,
               keystrokeData: document.keystroke_data,
             },
+          }, {
+            headers: {
+              'Cache-Control': 'public, max-age=300, s-maxage=86400, stale-while-revalidate=86400',
+            },
           });
         }
       } catch (dbError) {
@@ -41,8 +51,6 @@ export async function GET(
       }
     }
 
-    // For MVP demo, return a mock if not found in DB
-    // In production, this would return 404
     return NextResponse.json(
       { error: 'Document not found' },
       { status: 404 }

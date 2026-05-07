@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import { generateVerificationHash } from '@/lib/hash';
 import { createDocument } from '@/lib/db';
 import { getSiteUrl } from '@/lib/site';
+import { countWords } from '@/lib/metrics';
 import type { WritingSession } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
@@ -19,8 +20,7 @@ export async function POST(request: NextRequest) {
 
     // Mirror the editor's 10-word submission gate so the API can't be used
     // to mint certificates around documents that never met the threshold.
-    const trimmedWords = session.content.trim().split(/\s+/).filter(Boolean).length;
-    if (trimmedWords < 10) {
+    if (countWords(session.content) < 10) {
       return NextResponse.json(
         { error: 'Document must contain at least 10 words to be certified' },
         { status: 400 }

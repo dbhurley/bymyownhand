@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import type { WritingSession } from '@/lib/types';
 import { clearDraft, formatDraftAge, loadDraft, type DraftSnapshot } from '@/lib/draft';
+import { countWords } from '@/lib/metrics';
 
 // Dynamic import for Monaco to avoid SSR issues
 const LockedEditor = dynamic(() => import('@/components/LockedEditor'), {
@@ -213,7 +214,7 @@ function ResumeBanner({
   onResume: () => void;
   onDiscard: () => void;
 }) {
-  const wordCount = draft.content.trim().split(/\s+/).filter(Boolean).length;
+  const wordCount = countWords(draft.content);
   return (
     <div className="h-full flex items-center justify-center px-6 bg-cream">
       <div className="max-w-md w-full bg-white rounded-2xl border border-deep-blue/[0.08] p-6 md:p-8 shadow-sm">

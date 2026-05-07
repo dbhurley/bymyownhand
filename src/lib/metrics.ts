@@ -1,5 +1,24 @@
 import type { KeystrokeEvent, WritingMetrics } from './types';
 
+// Single source of truth for the word-counting rule used across the editor's
+// live counter, the API submission gate, the resume-banner draft summary, and
+// metric calculation. Trimming + collapsing whitespace + dropping empty tokens
+// is the contract; consolidating it here keeps the 10-word threshold and the
+// `averageWordLength` denominator in lockstep.
+export function countWords(content: string): number {
+  if (!content) return 0;
+  const trimmed = content.trim();
+  if (!trimmed) return 0;
+  return trimmed.split(/\s+/).filter(Boolean).length;
+}
+
+export function splitWords(content: string): string[] {
+  if (!content) return [];
+  const trimmed = content.trim();
+  if (!trimmed) return [];
+  return trimmed.split(/\s+/).filter(Boolean);
+}
+
 export function calculateMetrics(events: KeystrokeEvent[], content = ''): WritingMetrics {
   const keyEvents = events.filter(e => e.type === 'key');
   const deleteEvents = events.filter(e => e.type === 'delete');
@@ -43,7 +62,7 @@ export function calculateMetrics(events: KeystrokeEvent[], content = ''): Writin
   }
   
   // Average word length, derived from the final content
-  const words = content.trim().split(/\s+/).filter(Boolean);
+  const words = splitWords(content);
   const averageWordLength = words.length > 0
     ? Math.round((words.reduce((sum, w) => sum + w.length, 0) / words.length) * 10) / 10
     : 0;
