@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import type { WritingSession } from '@/lib/types';
 import { formatDuration, getScoreLabel } from '@/lib/metrics';
@@ -21,6 +22,7 @@ interface SessionData extends WritingSession {
 
 export default function SuccessPage({ params }: { params: Promise<{ hash: string }> }) {
   const { hash } = use(params);
+  const router = useRouter();
   const [session, setSession] = useState<SessionData | null>(null);
   const [copied, setCopied] = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
@@ -29,21 +31,31 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
 
   useEffect(() => {
     const stored = sessionStorage.getItem('lastSession');
-    if (!stored) return;
+    // Cold visits to /success/<hash> (a bookmark, a refresh after sessionStorage
+    // expired) used to render a placeholder card showing "0 words / 0s / 0 Low"
+    // for the user's own document — confusing, and incorrectly suggests a fresh
+    // certification was just made. Hand off to /verify/<hash> instead, which
+    // can fetch from the DB or fail clearly when neither source has the doc.
+    if (!stored) {
+      router.replace(`/verify/${hash}`);
+      return;
+    }
     const parsed: SessionData = JSON.parse(stored);
+    if (parsed.verificationHash !== hash) {
+      router.replace(`/verify/${hash}`);
+      return;
+    }
     setSession(parsed);
     // Record this certification once (idempotent on hash) and surface the
     // resulting streak/total so the writer sees their habit forming.
-    if (parsed.verificationHash) {
-      const summary = recordCertification({
-        hash: parsed.verificationHash,
-        certifiedAt: parsed.endedAt || Date.now(),
-        wordCount: parsed.wordCount || 0,
-        integrityScore: parsed.integrityScore || 0,
-      });
-      setStreakSummary(summary);
-    }
-  }, []);
+    const summary = recordCertification({
+      hash: parsed.verificationHash,
+      certifiedAt: parsed.endedAt || Date.now(),
+      wordCount: parsed.wordCount || 0,
+      integrityScore: parsed.integrityScore || 0,
+    });
+    setStreakSummary(summary);
+  }, [hash, router]);
 
   const verifyUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/verify/${hash}`
@@ -284,7 +296,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
             <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-6">Writing Analysis</p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
               <Metric label="Avg Keystroke" value={`${session.metrics.avgKeystrokeInterval}ms`} />
-              <Metric label="Variance" value={String(session.metrics.keystrokeVariance)} />
+              <Metric label="Variance" value={session.metrics.keystrokeVariance.toFixed(2)} />
               <Metric label="Thinking Pauses" value={String(session.metrics.pauseCount)} />
               <Metric label="Deletion Rate" value={`${(session.metrics.deletionRate * 100).toFixed(1)}%`} />
               <Metric label="Longest Burst" value={`${session.metrics.longestBurst} chars`} />

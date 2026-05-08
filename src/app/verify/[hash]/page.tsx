@@ -276,8 +276,17 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
               )}
             </div>
             <div className="bg-white text-center p-5">
-              <div className="text-2xl font-bold text-deep-blue mb-0.5">{metrics?.blockedPastes || 0}</div>
-              <div className="text-xs text-deep-blue/35 uppercase tracking-wider">Pastes Blocked</div>
+              {metrics ? (
+                <>
+                  <div className="text-2xl font-bold text-deep-blue mb-0.5">{metrics.blockedPastes}</div>
+                  <div className="text-xs text-deep-blue/35 uppercase tracking-wider">Pastes Blocked</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-deep-blue/30 mb-0.5">—</div>
+                  <div className="text-xs text-deep-blue/35 uppercase tracking-wider">No trace</div>
+                </>
+              )}
             </div>
           </div>
         </div>

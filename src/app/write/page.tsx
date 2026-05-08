@@ -99,7 +99,20 @@ export default function WritePage() {
             <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-100 rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
               <span className="text-xs text-red-600">{error}</span>
-            
+            </div>
+          )}
+          {isSubmitting && (
+            <div className="flex items-center gap-2">
+              <div className="w-3.5 h-3.5 border-2 border-deep-blue/20 border-t-deep-blue/60 rounded-full animate-spin" />
+              <span className="text-xs text-deep-blue/50">Certifying...</span>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* JSON-LD structured data. Previously these were nested inside the
+          submission-error pill, so they only emitted when a write attempt had
+          failed — defeating the SEO purpose. Rendered unconditionally now. */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: `{
@@ -107,10 +120,9 @@ export default function WritePage() {
   "@type": "Organization",
   "name": "By My Own Hand",
   "url": "https://bymyownhand.com",
-  "logo": "https://bymyownhand.com/images/logo.png" 
+  "logo": "https://bymyownhand.com/logo.svg"
 }` }}
       />
-            
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: `{
@@ -125,32 +137,6 @@ export default function WritePage() {
   }
 }` }}
       />
-            
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: `{
-  "@context": "https://schema.org",
-  "@type": "Article",
-  "headline": "Prove Your Writing is Human",
-  "description": "Certify your writing was created by your own hands. Block AI, capture keystrokes, prove authenticity...",
-  "image": "https://bymyownhand.com/images/logo.png",
-  "datePublished": "2024-01-01T00:00:00+00:00",
-  "dateModified": "2024-01-01T00:00:00+00:00",
-  "author": {
-    "@type": "Organization",
-    "name": "By My Own Hand"
-  },
-  "publisher": {
-    "@type": "Organization",
-    "name": "By My Own Hand",
-    "logo": {
-      "@type": "ImageObject",
-      "url": "https://bymyownhand.com/images/logo.png"
-    }
-  }
-}` }}
-      />
-            
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: `{
@@ -173,16 +159,6 @@ export default function WritePage() {
   }]
 }` }}
       />
-            </div>
-          )}
-          {isSubmitting && (
-            <div className="flex items-center gap-2">
-              <div className="w-3.5 h-3.5 border-2 border-deep-blue/20 border-t-deep-blue/60 rounded-full animate-spin" />
-              <span className="text-xs text-deep-blue/50">Certifying...</span>
-            </div>
-          )}
-        </div>
-      </header>
 
       {/* Editor */}
       <div className="flex-1 min-h-0 overflow-hidden">
