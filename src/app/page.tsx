@@ -1,6 +1,9 @@
 import Link from 'next/link';
+import { getSiteUrl } from '@/lib/site';
 
 export default function Home() {
+  const siteUrl = getSiteUrl();
+  const logoUrl = `${siteUrl}/logo.svg`;
   return (
     <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
       {/* Navigation */}
@@ -176,56 +179,28 @@ export default function Home() {
     
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: `{
-  "@context": "https://schema.org",
-  "@type": "Organization",
-  "name": "By My Own Hand",
-  "url": "https://bymyownhand.com"
-}` }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          name: 'By My Own Hand',
+          url: siteUrl,
+          logo: logoUrl,
+        }) }}
       />
-    
+
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: `{
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  "name": "By My Own Hand",
-  "url": "https://bymyownhand.com",
-  "potentialAction": {
-    "@type": "SearchAction",
-    "target": "https://bymyownhand.com/?s={search_term_string}",
-    "query-input": "required name=search_term_string"
-  }
-}` }}
-      />
-    
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: `{
-  "@context": "https://schema.org",
-  "@type": "Article",
-  "mainEntityOfPage": {
-    "@type": "WebPage",
-    "@id": "https://bymyownhand.com/"
-  },
-  "headline": "By My Own Hand | Prove Your Writing is Human",
-  "description": "Certify your writing was created by your own hands. Block AI, capture keystrokes, prove authenticity...",
-  "image": "https://bymyownhand.com/wp-content/uploads/2024/01/logo.png",
-  "author": {
-    "@type": "Organization",
-    "name": "By My Own Hand"
-  },
-  "publisher": {
-    "@type": "Organization",
-    "name": "By My Own Hand",
-    "logo": {
-      "@type": "ImageObject",
-      "url": "https://bymyownhand.com/wp-content/uploads/2024/01/logo.png"
-    }
-  },
-  "datePublished": "2024-01-01",
-  "dateModified": "2024-01-01"
-}` }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: 'By My Own Hand',
+          url: siteUrl,
+          potentialAction: {
+            '@type': 'SearchAction',
+            target: `${siteUrl}/?s={search_term_string}`,
+            'query-input': 'required name=search_term_string',
+          },
+        }) }}
       />
     </div>
   );

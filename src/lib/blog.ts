@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import { marked } from 'marked';
+import { countWords } from './metrics';
 
 export interface BlogPost {
   slug: string;
@@ -114,7 +115,10 @@ function parsePost(filename: string): BlogPost | null {
     }
 
     const html = marked.parse(body) as string;
-    const wordCount = body.split(/\s+/).length;
+    // Use the shared word-counting contract (trim + collapse whitespace + drop
+    // empty tokens) rather than a bespoke regex so blog read-time and the
+    // editor's 10-word certification gate stay in lockstep.
+    const wordCount = countWords(body);
     const slugMatch = filename.match(/^\d{4}-\d{2}-\d{2}-(.+)\.md$/);
     const slug = slugMatch ? slugMatch[1] : filename.replace('.md', '');
 

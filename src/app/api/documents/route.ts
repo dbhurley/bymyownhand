@@ -20,7 +20,11 @@ export async function POST(request: NextRequest) {
 
     // Mirror the editor's 10-word submission gate so the API can't be used
     // to mint certificates around documents that never met the threshold.
-    if (countWords(session.content) < 10) {
+    // Recompute the count server-side rather than trusting the client-supplied
+    // `session.wordCount` — a direct API caller could otherwise certify a
+    // 12-word doc while claiming 10,000 words in the persisted record.
+    const serverWordCount = countWords(session.content);
+    if (serverWordCount < 10) {
       return NextResponse.json(
         { error: 'Document must contain at least 10 words to be certified' },
         { status: 400 }
@@ -44,7 +48,7 @@ export async function POST(request: NextRequest) {
       id: docId,
       title,
       content: session.content,
-      wordCount: session.wordCount,
+      wordCount: serverWordCount,
       writingTimeMs,
       verificationHash,
       keystrokeData: {
