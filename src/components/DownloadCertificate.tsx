@@ -55,11 +55,17 @@ export function DownloadCertificate({
         />
       ).toBlob();
 
-      // Download
+      // Download. Filename slug strips non-Latin characters (so titles in
+      // Japanese, Cyrillic, Arabic, etc. would collapse to dashes only and
+      // produce identical filenames across certifications). Fall back to the
+      // verification hash whenever the slug collapses to nothing useful, so
+      // every certificate gets a distinct, openable filename.
+      const slug = title.replace(/[^a-z0-9]/gi, '-').replace(/^-+|-+$/g, '').toLowerCase();
+      const safeSlug = slug || verificationHash;
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-certificate.pdf`;
+      link.download = `${safeSlug}-certificate.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

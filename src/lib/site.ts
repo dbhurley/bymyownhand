@@ -9,3 +9,17 @@ export function getSiteUrl(): string {
   if (fromEnv) return fromEnv.replace(/\/$/, '');
   return FALLBACK_SITE_URL;
 }
+
+// Single source of truth for the absolute /verify/<hash> URL. Prefers the
+// current browser origin so a writer who landed on a non-canonical host (a
+// preview URL, a custom domain that hasn't yet been set as NEXT_PUBLIC_SITE_URL)
+// gets a proof link that points back at the surface they're actually on, then
+// falls back to getSiteUrl() during SSR. Previously inlined in both
+// `/success/<hash>` and `/verify/<hash>` — same drift-prevention shape as the
+// prior getScoreLabel / buildEmbedSnippets / countWords consolidations.
+export function buildVerifyUrl(hash: string): string {
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/verify/${hash}`;
+  }
+  return `${getSiteUrl()}/verify/${hash}`;
+}

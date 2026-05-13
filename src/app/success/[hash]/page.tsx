@@ -8,7 +8,7 @@ import type { WritingSession } from '@/lib/types';
 import { formatDuration, getScoreLabel } from '@/lib/metrics';
 import { buildEmbedSnippets } from '@/lib/embed';
 import { recordCertification, type StreakSummary } from '@/lib/history';
-import { getSiteUrl } from '@/lib/site';
+import { buildVerifyUrl } from '@/lib/site';
 
 const DownloadCertificate = dynamic(
   () => import('@/components/DownloadCertificate').then(mod => mod.DownloadCertificate),
@@ -58,12 +58,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
     setStreakSummary(summary);
   }, [hash, router]);
 
-  // SSR fallback uses `getSiteUrl()` so the embed-badge snippet rendered in
-  // initial HTML carries an absolute proof link rather than a relative one.
-  // `/verify/<hash>` already resolves the same way; this is the matching half.
-  const verifyUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/verify/${hash}`
-    : `${getSiteUrl()}/verify/${hash}`;
+  const verifyUrl = buildVerifyUrl(hash);
 
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(verifyUrl);

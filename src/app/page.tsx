@@ -195,11 +195,6 @@ export default function Home() {
           '@type': 'WebSite',
           name: 'By My Own Hand',
           url: siteUrl,
-          potentialAction: {
-            '@type': 'SearchAction',
-            target: `${siteUrl}/?s={search_term_string}`,
-            'query-input': 'required name=search_term_string',
-          },
         }) }}
       />
     </div>

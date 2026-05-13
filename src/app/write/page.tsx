@@ -7,6 +7,7 @@ import Link from 'next/link';
 import type { WritingSession } from '@/lib/types';
 import { clearDraft, formatDraftAge, loadDraft, type DraftSnapshot } from '@/lib/draft';
 import { countWords } from '@/lib/metrics';
+import { getSiteUrl } from '@/lib/site';
 
 // Dynamic import for Monaco to avoid SSR issues
 const LockedEditor = dynamic(() => import('@/components/LockedEditor'), {
@@ -25,6 +26,8 @@ type DraftDecision = 'pending' | 'resume' | 'fresh';
 
 export default function WritePage() {
   const router = useRouter();
+  const siteUrl = getSiteUrl();
+  const logoUrl = `${siteUrl}/logo.svg`;
   const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,54 +113,54 @@ export default function WritePage() {
         </div>
       </header>
 
-      {/* JSON-LD structured data. Previously these were nested inside the
-          submission-error pill, so they only emitted when a write attempt had
-          failed — defeating the SEO purpose. Rendered unconditionally now. */}
+      {/* JSON-LD structured data. URLs resolve through getSiteUrl() so
+          staging/local-preview pages emit their own canonical instead of
+          hard-coding production. The SearchAction was dropped because this
+          site has no /?s=... search route — declaring one was a freshness
+          lie that would never have enabled Sitelinks Search Box. */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: `{
-  "@context": "https://schema.org",
-  "@type": "Organization",
-  "name": "By My Own Hand",
-  "url": "https://bymyownhand.com",
-  "logo": "https://bymyownhand.com/logo.svg"
-}` }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          name: 'By My Own Hand',
+          url: siteUrl,
+          logo: logoUrl,
+        }) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: `{
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  "name": "By My Own Hand",
-  "url": "https://bymyownhand.com",
-  "potentialAction": {
-    "@type": "SearchAction",
-    "target": "https://bymyownhand.com/?s={search_term_string}",
-    "query-input": "required name=search_term_string"
-  }
-}` }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: 'By My Own Hand',
+          url: siteUrl,
+        }) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: `{
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [{
-    "@type": "Question",
-    "name": "Why is it important to prove my writing is human?",
-    "acceptedAnswer": {
-      "@type": "Answer",
-      "text": "It helps to maintain authenticity and originality in a world increasingly influenced by AI-generated content."
-    }
-  },{
-    "@type": "Question",
-    "name": "How does By My Own Hand help prove my writing is human?",
-    "acceptedAnswer": {
-      "@type": "Answer",
-      "text": "By capturing keystrokes and analyzing writing patterns, By My Own Hand provides evidence that your writing is genuinely your own."
-    }
-  }]
-}` }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'FAQPage',
+          mainEntity: [
+            {
+              '@type': 'Question',
+              name: 'Why is it important to prove my writing is human?',
+              acceptedAnswer: {
+                '@type': 'Answer',
+                text: 'It helps to maintain authenticity and originality in a world increasingly influenced by AI-generated content.',
+              },
+            },
+            {
+              '@type': 'Question',
+              name: 'How does By My Own Hand help prove my writing is human?',
+              acceptedAnswer: {
+                '@type': 'Answer',
+                text: 'By capturing keystrokes and analyzing writing patterns, By My Own Hand provides evidence that your writing is genuinely your own.',
+              },
+            },
+          ],
+        }) }}
       />
 
       {/* Editor */}

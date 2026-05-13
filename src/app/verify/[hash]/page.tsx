@@ -4,7 +4,7 @@ import { useEffect, useState, use, useRef } from 'react';
 import Link from 'next/link';
 import type { WritingMetrics, KeystrokeEvent } from '@/lib/types';
 import { calculateIntegrityScore, formatDuration, getScoreLabel } from '@/lib/metrics';
-import { getSiteUrl } from '@/lib/site';
+import { buildVerifyUrl } from '@/lib/site';
 import { buildEmbedSnippets } from '@/lib/embed';
 
 interface DocumentData {
@@ -200,9 +200,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
     ? Math.round((document.wordCount / document.writingTimeMs) * 60000)
     : 0;
 
-  const verifyUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/verify/${hash}`
-    : `${getSiteUrl()}/verify/${hash}`;
+  const verifyUrl = buildVerifyUrl(hash);
   const tweetText = `"${document.title}" was written by hand — every keystroke proven human. ${verifyUrl}`;
   const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
   const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(verifyUrl)}`;
