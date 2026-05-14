@@ -49,8 +49,12 @@ export function calculateMetrics(events: KeystrokeEvent[], content = ''): Writin
     ? deleteEvents.length / totalKeystrokes 
     : 0;
   
-  // Longest burst (consecutive keystrokes < 500ms apart)
-  let longestBurst = 0;
+  // Longest burst (consecutive keystrokes < 500ms apart). Floor at 1 whenever
+  // any keys were typed: a deliberate writer whose every keystroke is >500ms
+  // apart still produced a "burst" of one character — reporting 0 chars there
+  // (on the certificate and the verify panel) was wrong, and ironically made
+  // the most careful human writers look like they typed nothing.
+  let longestBurst = keyEvents.length > 0 ? 1 : 0;
   let currentBurst = 1;
   for (const interval of intervals) {
     if (interval < 500) {

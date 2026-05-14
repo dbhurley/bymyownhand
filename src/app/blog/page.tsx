@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getAllPosts, getFeaturedPost, getCategories, getAllTags } from '@/lib/blog';
+import { getSiteUrl } from '@/lib/site';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -25,6 +26,7 @@ export default function BlogPage() {
   const categories = getCategories();
   const tags = getAllTags();
   const allPosts = getAllPosts();
+  const siteUrl = getSiteUrl();
 
   return (
     <>
@@ -111,23 +113,38 @@ export default function BlogPage() {
               </div>
             </Link>
           </div>
-        
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: `{"@context": "https://schema.org","@type": "Organization","name": "By My Own Hand","url": "https://bymyownhand.com","logo": "https://bymyownhand.com/images/logo.png"}` }}
-      />
-        
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: `{"@context": "https://schema.org","@type": "WebSite","name": "By My Own Hand Blog","url": "https://bymyownhand.com/blog","potentialAction": {"@type": "SearchAction","target": "https://bymyownhand.com/blog?s={search_term_string}","query-input": "required name=search_term_string"}}` }}
-      />
-        
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: `{"@context": "https://schema.org","@type": "Article","headline": "Blog | By My Own Hand | By My Own Hand","description": "Insights on human authenticity, writing verification, identity, and the future of trust in a world o...","image": "https://bymyownhand.com/images/logo.png","datePublished": "2024-01-01T00:00:00+00:00","dateModified": "2024-01-01T00:00:00+00:00","author": {"@type": "Organization","name": "By My Own Hand"},"publisher": {"@type": "Organization","name": "By My Own Hand","logo": {"@type": "ImageObject","url": "https://bymyownhand.com/images/logo.png"}}}` }}
-      />
         </section>
       )}
+
+      {/* JSON-LD structured data. Rendered unconditionally — these blocks used
+          to be nested inside the {featured && (...)} section, so a /blog crawl
+          with no featured post emitted no structured data at all. URLs now
+          resolve through getSiteUrl() instead of a hard-coded production
+          domain, and the broken /images/logo.png path is replaced with the
+          real /logo.svg. The fake `SearchAction` (target /blog?s=... — a route
+          this site has no search UI for) and the `Article` block (wrong type
+          for an index page, carrying a permanent 2024-01-01 freshness lie and
+          a doubled headline) are dropped — same honesty fixes already applied
+          to the / and /write JSON-LD. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          name: 'By My Own Hand',
+          url: siteUrl,
+          logo: `${siteUrl}/logo.svg`,
+        }) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: 'By My Own Hand Blog',
+          url: `${siteUrl}/blog`,
+        }) }}
+      />
 
       {/* ── Main Content + Sidebar ── */}
       <section className="px-6 md:px-12 pb-16">

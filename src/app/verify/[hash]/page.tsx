@@ -90,7 +90,14 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
 
     const content = document.content;
     const events = document.keystrokeData.events;
-    const keyEvents = events.filter(e => e.type === 'key' || e.type === 'delete');
+    // Include `paste_internal` events — intra-editor copy/paste is explicitly
+    // allowed by the locked editor, and each one inserts `len` characters at
+    // once. Counting only `key`/`delete` left the cursor short of the real
+    // content length on any document that used internal paste, so playback
+    // ended early and then snapped to the full text.
+    const keyEvents = events.filter(
+      e => e.type === 'key' || e.type === 'delete' || e.type === 'paste_internal'
+    );
     let currentIndex = 0;
     // Drive playback positionally from the certified content so cased letters,
     // unicode, and punctuation render exactly as they were written. The
@@ -109,6 +116,8 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
 
       if (event.type === 'delete') {
         forwardCount = Math.max(0, forwardCount - 1);
+      } else if (event.type === 'paste_internal') {
+        forwardCount = Math.min(content.length, forwardCount + (event.len ?? 1));
       } else {
         forwardCount = Math.min(content.length, forwardCount + 1);
       }

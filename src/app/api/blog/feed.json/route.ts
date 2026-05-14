@@ -22,7 +22,10 @@ export async function GET() {
       summary: post.excerpt,
       date_published: parsed.toISOString(),
       tags: post.tags,
-      authors: [{ name: 'By My Own Hand' }],
+      // Honor the post's parsed `author` frontmatter rather than hard-coding
+      // the site name — posts carry distinct authors and the feed should
+      // reflect them. Falls back to the site name when frontmatter omits it.
+      authors: [{ name: post.author || 'By My Own Hand' }],
     }];
   });
 
