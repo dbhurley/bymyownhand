@@ -4,7 +4,7 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
 import type { KeystrokeEvent, WritingSession } from '@/lib/types';
 import { calculateMetrics, calculateIntegrityScore, countWords, formatDuration } from '@/lib/metrics';
-import { DRAFT_STORAGE_KEY, type DraftSnapshot } from '@/lib/draft';
+import { clearDraft, DRAFT_STORAGE_KEY, type DraftSnapshot } from '@/lib/draft';
 import { nanoid } from 'nanoid';
 
 interface LockedEditorProps {
@@ -205,9 +205,7 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
       integrityScore,
     };
 
-    if (typeof window !== 'undefined') {
-      try { window.localStorage.removeItem(DRAFT_STORAGE_KEY); } catch {}
-    }
+    clearDraft();
 
     onComplete(session);
   };

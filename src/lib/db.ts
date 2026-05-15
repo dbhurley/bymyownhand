@@ -80,7 +80,12 @@ export async function getDocumentByHash(hash: string) {
   return results[0] || null;
 }
 
-// Helper to create document
+// Helper to create document. Note: the integrity score is derived from the
+// keystroke trace at read time (see lib/metrics.calculateIntegrityScore + the
+// /verify/<hash> page), not persisted to its own column — the trace is the
+// canonical record. The signature used to accept an `integrityScore` field
+// that the INSERT never used, which would mislead a future reader into
+// thinking the column existed.
 export async function createDocument(doc: {
   id: string;
   title: string;
@@ -89,7 +94,6 @@ export async function createDocument(doc: {
   writingTimeMs: number;
   verificationHash: string;
   keystrokeData: object;
-  integrityScore: number;
 }) {
   const sql = getSql();
   if (!sql) {

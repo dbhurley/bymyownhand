@@ -1,4 +1,5 @@
-import { getAllPosts, getPostBySlug, getRelatedPosts } from '@/lib/blog';
+import { getAllPosts, getPostBySlug, getRelatedPosts, visibleTags } from '@/lib/blog';
+import { getSiteUrl } from '@/lib/site';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
@@ -14,6 +15,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const post = getPostBySlug(slug);
   if (!post) return { title: 'Post not found' };
 
+  // Honor the post's frontmatter `author` rather than hard-coding the site
+  // name — parsePost() already extracts it, and the JSON Feed has used it
+  // since the §6.17 polish. OG metadata was the last surface still flattening
+  // every post to a single house byline.
+  const authorName = post.author || 'By My Own Hand';
   return {
     title: `${post.title} | By My Own Hand Blog`,
     description: post.excerpt,
@@ -22,7 +28,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       description: post.excerpt,
       type: 'article',
       publishedTime: post.date,
-      authors: ['By My Own Hand'],
+      authors: [authorName],
       tags: post.tags,
     },
   };
@@ -34,20 +40,40 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   if (!post) notFound();
 
   const related = getRelatedPosts(slug, post.tags, 3);
-  const filteredTags = post.tags.filter(t => !['ByMyOwnHand', 'Next.js'].includes(t));
+  const filteredTags = visibleTags(post.tags);
 
+  // JSON-LD honesty pass, in the same shape as the §6.14–§6.17 sweep on
+  // `/`, `/write`, and `/blog`:
+  //   - `publisher.logo.url` must be an absolute URL (a relative `/logo.svg`
+  //     is invalid in a JSON-LD context and gets dropped by stricter parsers);
+  //   - `author` honors the post's frontmatter `author` (and is typed as a
+  //     Person when present, Organization for the house byline) — the feed
+  //     was already doing this; the page schema was the last surface to flatten
+  //     every post to "By My Own Hand";
+  //   - `dateModified` is required by Google for the Article rich result;
+  //     posts here are static, so it mirrors `datePublished`;
+  //   - `mainEntityOfPage` and `image` round out the rich-result requirements.
+  const siteUrl = getSiteUrl();
+  const postUrl = `${siteUrl}/blog/${post.slug}`;
+  const logoUrl = `${siteUrl}/logo.svg`;
+  const author = post.author
+    ? { '@type': 'Person', name: post.author }
+    : { '@type': 'Organization', name: 'By My Own Hand' };
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
     headline: post.title,
     datePublished: post.date,
+    dateModified: post.date,
     description: post.excerpt,
     keywords: post.tags.join(', '),
-    author: { '@type': 'Organization', name: 'By My Own Hand' },
+    mainEntityOfPage: { '@type': 'WebPage', '@id': postUrl },
+    image: logoUrl,
+    author,
     publisher: {
       '@type': 'Organization',
       name: 'By My Own Hand',
-      logo: { '@type': 'ImageObject', url: '/logo.svg' },
+      logo: { '@type': 'ImageObject', url: logoUrl },
     },
   };
 
@@ -82,7 +108,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
               <img src="/logo.svg" alt="" width="20" height="18" style={{ filter: 'brightness(0) invert(1)' }} />
             </div>
             <div>
-              <p className="text-sm font-medium text-cream/80">By My Own Hand</p>
+              <p className="text-sm font-medium text-cream/80">{post.author || 'By My Own Hand'}</p>
               <div className="flex items-center gap-3 text-sm text-cream/40">
                 <time dateTime={post.date}>{formatDate(post.date)}</time>
                 <span className="w-1 h-1 bg-cream/20 rounded-full" />
@@ -143,7 +169,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
               {related.map(rp => (
                 <Link key={rp.slug} href={`/blog/${rp.slug}`} className="blog-card group">
                   <div className="flex flex-wrap gap-2 mb-3">
-                    {rp.tags.filter(t => !['ByMyOwnHand', 'Next.js'].includes(t)).slice(0, 2).map(tag => (
+                    {visibleTags(rp.tags).slice(0, 2).map(tag => (
                       <span key={tag} className="blog-tag blog-tag-blue">{tag}</span>
                     ))}
                     <span className="text-xs text-deep-blue/30">{rp.date}</span>

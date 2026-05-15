@@ -42,8 +42,10 @@ export async function POST(request: NextRequest) {
     const verificationHash = generateVerificationHash();
     const writingTimeMs = (session.endedAt || Date.now()) - session.startedAt;
 
-    // For MVP without database, store in memory or return hash directly
-    // In production, this would save to Neon
+    // For MVP without database, store in memory or return hash directly.
+    // In production, this saves to Neon. Note: integrity score isn't a
+    // separate column — it's derived from the keystroke trace at read time
+    // by /verify/<hash>, so the trace is the canonical record.
     const document = {
       id: docId,
       title,
@@ -55,7 +57,6 @@ export async function POST(request: NextRequest) {
         events: session.events,
         metrics: session.metrics,
       },
-      integrityScore: session.integrityScore || 0,
     };
 
     // Try to save to database if configured

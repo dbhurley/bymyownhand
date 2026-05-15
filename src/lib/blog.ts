@@ -63,7 +63,20 @@ const CATEGORY_MAP = [
   },
 ];
 
+// Tags that are noise on a writing-authenticity blog (project meta / stack
+// detail) — hidden from category indexes, post chips, and related-post chips.
+// Single source of truth for the rule; previously the page also filtered
+// inline with a case-sensitive `['ByMyOwnHand', 'Next.js']` array, which
+// missed lowercase variants and was drift-prone.
 const FILTERED_TAGS = new Set(['bymyownhand', 'next.js']);
+
+export function isVisibleTag(tag: string): boolean {
+  return !FILTERED_TAGS.has(tag.toLowerCase());
+}
+
+export function visibleTags(tags: string[]): string[] {
+  return tags.filter(isVisibleTag);
+}
 
 function stripFrontmatter(raw: string): { body: string; title: string; date: string; excerpt: string; tags: string[]; author: string } {
   let body = raw;
@@ -201,7 +214,7 @@ export function getAllTags(): TagCount[] {
 
   for (const post of posts) {
     for (const tag of post.tags) {
-      if (!FILTERED_TAGS.has(tag.toLowerCase())) {
+      if (isVisibleTag(tag)) {
         tagMap.set(tag, (tagMap.get(tag) || 0) + 1);
       }
     }
