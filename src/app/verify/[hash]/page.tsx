@@ -6,6 +6,7 @@ import type { WritingMetrics, KeystrokeEvent } from '@/lib/types';
 import { calculateIntegrityScore, formatDuration, getScoreLabel } from '@/lib/metrics';
 import { buildVerifyUrl } from '@/lib/site';
 import { buildEmbedSnippets } from '@/lib/embed';
+import { buildLinkedInShareUrl, buildTweetUrl } from '@/lib/share';
 
 interface DocumentData {
   id: string;
@@ -211,8 +212,8 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
 
   const verifyUrl = buildVerifyUrl(hash);
   const tweetText = `"${document.title}" was written by hand — every keystroke proven human. ${verifyUrl}`;
-  const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
-  const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(verifyUrl)}`;
+  const tweetUrl = buildTweetUrl(tweetText);
+  const linkedInUrl = buildLinkedInShareUrl(verifyUrl);
   const embeds = buildEmbedSnippets(verifyUrl);
   const embedSnippet = embedFormat === 'markdown' ? embeds.markdown : embeds.html;
 

@@ -115,9 +115,15 @@ export default function WritePage() {
 
       {/* JSON-LD structured data. URLs resolve through getSiteUrl() so
           staging/local-preview pages emit their own canonical instead of
-          hard-coding production. The SearchAction was dropped because this
-          site has no /?s=... search route — declaring one was a freshness
-          lie that would never have enabled Sitelinks Search Box. */}
+          hard-coding production. The SearchAction was dropped (§6.16) because
+          this site has no /?s=... search route. The FAQPage block was dropped
+          too: Google's FAQ schema requires the Q&A content to be visible to
+          users on the page at the same URL, but `/write` is just the locked
+          editor — the questions and answers were never rendered anywhere on
+          this surface. Google also deprecated FAQ rich results in Aug 2023
+          (only government/health sites still get them), so the block was
+          carrying real schema-policy risk for zero SEO upside. Same honesty
+          principle as the prior "no fabricated evidence" series. */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify({
@@ -137,31 +143,6 @@ export default function WritePage() {
           url: siteUrl,
         }) }}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify({
-          '@context': 'https://schema.org',
-          '@type': 'FAQPage',
-          mainEntity: [
-            {
-              '@type': 'Question',
-              name: 'Why is it important to prove my writing is human?',
-              acceptedAnswer: {
-                '@type': 'Answer',
-                text: 'It helps to maintain authenticity and originality in a world increasingly influenced by AI-generated content.',
-              },
-            },
-            {
-              '@type': 'Question',
-              name: 'How does By My Own Hand help prove my writing is human?',
-              acceptedAnswer: {
-                '@type': 'Answer',
-                text: 'By capturing keystrokes and analyzing writing patterns, By My Own Hand provides evidence that your writing is genuinely your own.',
-              },
-            },
-          ],
-        }) }}
-      />
 
       {/* Editor */}
       <div className="flex-1 min-h-0 overflow-hidden">
@@ -177,6 +158,7 @@ export default function WritePage() {
             onTitleChange={setTitle}
             onComplete={handleComplete}
             initialDraft={decision === 'resume' ? draft : null}
+            isSubmitting={isSubmitting}
           />
         ) : null}
       </div>

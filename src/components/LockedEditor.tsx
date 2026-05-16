@@ -12,9 +12,17 @@ interface LockedEditorProps {
   title: string;
   onTitleChange: (title: string) => void;
   initialDraft?: DraftSnapshot | null;
+  // Parent's POST /api/documents in flight. Disables the Complete button so a
+  // rapid double-click can't fire two onComplete calls — which used to produce
+  // two verification hashes for the same writing session and race on the
+  // /success/<hash> redirect (sessionStorage.lastSession pointed at one hash,
+  // URL bar showed the other, success page's hash-match check then bounced
+  // the writer to /verify). When the parent's submission errors out, it
+  // resets isSubmitting and the writer can retry.
+  isSubmitting?: boolean;
 }
 
-export default function LockedEditor({ onComplete, title, onTitleChange, initialDraft }: LockedEditorProps) {
+export default function LockedEditor({ onComplete, title, onTitleChange, initialDraft, isSubmitting = false }: LockedEditorProps) {
   const [content, setContent] = useState(initialDraft?.content ?? '');
   const [wordCount, setWordCount] = useState(0);
   const [sessionId] = useState(() => initialDraft?.sessionId ?? nanoid());
@@ -189,6 +197,7 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
   }, [content, title, sessionId, startTime, blockedPasteCount, isRecording]);
 
   const handleSubmit = () => {
+    if (isSubmitting) return;
     setIsRecording(false);
 
     const metrics = calculateMetrics(eventsRef.current, content);
@@ -319,14 +328,14 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
 
           <button
             onClick={handleSubmit}
-            disabled={wordCount < 10}
+            disabled={wordCount < 10 || isSubmitting}
             className="group flex items-center gap-2 px-6 py-2.5 bg-deep-blue text-cream rounded-full font-medium text-sm
                        hover:bg-deep-blue/90 transition-all duration-200
                        disabled:opacity-30 disabled:cursor-not-allowed
                        enabled:hover:-translate-y-0.5"
           >
             Complete
-            {wordCount >= 10 && (
+            {wordCount >= 10 && !isSubmitting && (
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="group-hover:translate-x-0.5 transition-transform">
                 <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>

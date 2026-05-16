@@ -18,6 +18,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Sanitize the title server-side. The web client falls back to
+    // 'Untitled Document' on empty input, but the truthy check above accepts
+    // a whitespace-only string (`"   "`), which would then persist as an
+    // empty title across the verify page, the certificate PDF, the OG/Twitter
+    // share preview, and any downstream profile/leaderboard surface. Trim
+    // here, fall back to the same placeholder the client uses, and cap to a
+    // reasonable length so a maliciously long title can't blow up the
+    // record. Trust-boundary fix paralleling the server-computed `wordCount`
+    // in §6.15 — the server is the canonical source for what it admits.
+    const normalizedTitle = title.trim().slice(0, 200) || 'Untitled Document';
+
     // Mirror the editor's 10-word submission gate so the API can't be used
     // to mint certificates around documents that never met the threshold.
     // Recompute the count server-side rather than trusting the client-supplied
@@ -48,7 +59,7 @@ export async function POST(request: NextRequest) {
     // by /verify/<hash>, so the trace is the canonical record.
     const document = {
       id: docId,
-      title,
+      title: normalizedTitle,
       content: session.content,
       wordCount: serverWordCount,
       writingTimeMs,

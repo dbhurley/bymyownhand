@@ -9,6 +9,7 @@ import { formatDuration, getScoreLabel } from '@/lib/metrics';
 import { buildEmbedSnippets } from '@/lib/embed';
 import { recordCertification, type StreakSummary } from '@/lib/history';
 import { buildVerifyUrl } from '@/lib/site';
+import { buildLinkedInShareUrl, buildTweetUrl } from '@/lib/share';
 
 const DownloadCertificate = dynamic(
   () => import('@/components/DownloadCertificate').then(mod => mod.DownloadCertificate),
@@ -68,8 +69,8 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
 
   const shareTitle = session?.title || 'My document';
   const tweetText = `I wrote "${shareTitle}" by my own hand — every keystroke proven human. ${verifyUrl}`;
-  const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
-  const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(verifyUrl)}`;
+  const tweetUrl = buildTweetUrl(tweetText);
+  const linkedInUrl = buildLinkedInShareUrl(verifyUrl);
   const embeds = buildEmbedSnippets(verifyUrl);
   const embedSnippet = embedFormat === 'markdown' ? embeds.markdown : embeds.html;
 
