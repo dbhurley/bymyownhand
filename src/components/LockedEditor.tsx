@@ -131,11 +131,22 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
         return;
       }
 
-      // Record regular keystroke
+      // Record regular keystroke. Whitelist any KeyboardEvent.code that
+      // produces a printable character or a writing-relevant whitespace key,
+      // and explicitly skip navigation/function/lock/media keys. The old
+      // whitelist missed Minus/Equal/Slash/Backslash/Backquote/Tab and the
+      // entire Numpad family, so hyphens, dates ("5/17/2026"), backticks, and
+      // numbers typed on the numeric keypad never made it into the trace —
+      // which deflates variance, longestBurst, and pause counts on real
+      // human writing.
       if (e.code.startsWith('Key') || e.code.startsWith('Digit') ||
-          e.code === 'Space' || e.code === 'Enter' ||
+          e.code.startsWith('Numpad') ||
           e.code.startsWith('Bracket') || e.code.startsWith('Quote') ||
-          e.code === 'Comma' || e.code === 'Period' || e.code === 'Semicolon') {
+          e.code === 'Space' || e.code === 'Enter' || e.code === 'Tab' ||
+          e.code === 'Comma' || e.code === 'Period' || e.code === 'Semicolon' ||
+          e.code === 'Minus' || e.code === 'Equal' ||
+          e.code === 'Slash' || e.code === 'Backslash' ||
+          e.code === 'Backquote' || e.code === 'IntlBackslash') {
         recordEvent({
           type: 'key',
           key: e.code,
@@ -166,19 +177,32 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
 
   // Auto-save the in-progress draft to localStorage. The full keystroke trace
   // is preserved so a resumed session keeps integrity scoring intact.
+  //
+  // The persist callback reads from a ref instead of closure state so the
+  // 3-second interval can be set up once and tick steadily. Previously the
+  // effect's deps included `content`, so each keystroke cleared the interval
+  // and started a fresh 3000ms timer — meaning a writer typing continuously
+  // would never see an autosave fire until they paused for ≥3s (or closed the
+  // tab, which fires `beforeunload`).
+  const draftSnapshotRef = useRef({ title, content, blockedPasteCount });
+  useEffect(() => {
+    draftSnapshotRef.current = { title, content, blockedPasteCount };
+  }, [title, content, blockedPasteCount]);
+
   useEffect(() => {
     if (!isRecording) return;
     if (typeof window === 'undefined') return;
 
     const persist = () => {
-      if (!content.trim() && !title.trim()) return;
+      const { title: t, content: c, blockedPasteCount: b } = draftSnapshotRef.current;
+      if (!c.trim() && !t.trim()) return;
       const snapshot: DraftSnapshot = {
         sessionId,
-        title,
-        content,
+        title: t,
+        content: c,
         events: eventsRef.current,
         startTime,
-        blockedPasteCount,
+        blockedPasteCount: b,
         savedAt: Date.now(),
       };
       try {
@@ -194,7 +218,7 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
       window.clearInterval(interval);
       window.removeEventListener('beforeunload', persist);
     };
-  }, [content, title, sessionId, startTime, blockedPasteCount, isRecording]);
+  }, [sessionId, startTime, isRecording]);
 
   const handleSubmit = () => {
     if (isSubmitting) return;

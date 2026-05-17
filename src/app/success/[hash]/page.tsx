@@ -76,6 +76,9 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
 
   const writingTime = session ? (session.endedAt || Date.now()) - session.startedAt : 0;
   const scoreInfo = session ? getScoreLabel(session.integrityScore || 0) : { label: '', color: '' };
+  const wpm = session && writingTime > 0
+    ? Math.round((session.wordCount / writingTime) * 60000)
+    : 0;
 
   return (
     <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
@@ -301,7 +304,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
               <Metric label="Deletion Rate" value={`${(session.metrics.deletionRate * 100).toFixed(1)}%`} />
               <Metric label="Longest Burst" value={`${session.metrics.longestBurst} chars`} />
               <Metric label="Avg Word Length" value={`${session.metrics.averageWordLength} chars`} />
-              <Metric label="Blocked Pastes" value={String(session.metrics.blockedPastes)} />
+              <Metric label="WPM" value={String(wpm)} />
             </div>
           </div>
         )}

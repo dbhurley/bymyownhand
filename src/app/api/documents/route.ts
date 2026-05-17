@@ -51,7 +51,16 @@ export async function POST(request: NextRequest) {
 
     const docId = nanoid();
     const verificationHash = generateVerificationHash();
-    const writingTimeMs = (session.endedAt || Date.now()) - session.startedAt;
+    // Sanitize the writing window server-side. A direct API caller could send
+    // a future startedAt, a NaN endedAt, or an inverted pair — which would
+    // persist a negative or non-finite writing_time_ms and tarnish every
+    // downstream surface that reads it (WPM, /verify Duration cell, the
+    // certificate PDF). Trust-boundary fix paralleling the prior server-side
+    // wordCount (§6.15) and title (§6.19) sanitization.
+    const startedAt = Number(session.startedAt);
+    const endedAt = Number(session.endedAt) || Date.now();
+    const rawWindow = endedAt - startedAt;
+    const writingTimeMs = Number.isFinite(rawWindow) && rawWindow > 0 ? rawWindow : 0;
 
     // For MVP without database, store in memory or return hash directly.
     // In production, this saves to Neon. Note: integrity score isn't a
