@@ -3,7 +3,7 @@
 import { useEffect, useState, use, useRef } from 'react';
 import Link from 'next/link';
 import type { WritingMetrics, KeystrokeEvent } from '@/lib/types';
-import { calculateIntegrityScore, formatDuration, getScoreLabel } from '@/lib/metrics';
+import { calculateIntegrityScore, computeWpm, formatDuration, getScoreLabel } from '@/lib/metrics';
 import { buildVerifyUrl } from '@/lib/site';
 import { buildEmbedSnippets } from '@/lib/embed';
 import { buildLinkedInShareUrl, buildTweetUrl } from '@/lib/share';
@@ -206,9 +206,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
     ? calculateIntegrityScore(metrics, document.wordCount, document.writingTimeMs)
     : null;
   const scoreInfo = integrityScore !== null ? getScoreLabel(integrityScore) : null;
-  const wpm = document.writingTimeMs > 0
-    ? Math.round((document.wordCount / document.writingTimeMs) * 60000)
-    : 0;
+  const wpm = Math.round(computeWpm(document.wordCount, document.writingTimeMs));
 
   const verifyUrl = buildVerifyUrl(hash);
   const tweetText = `"${document.title}" was written by hand — every keystroke proven human. ${verifyUrl}`;

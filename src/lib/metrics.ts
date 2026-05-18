@@ -82,16 +82,30 @@ export function calculateMetrics(events: KeystrokeEvent[], content = ''): Writin
   };
 }
 
+// Single source of truth for the WPM calculation. The
+// `writingTimeMs > 0 ? (wordCount / writingTimeMs) * 60000 : 0` pattern was
+// duplicated four times — `/success/<hash>`, `/verify/<hash>`, the certificate
+// PDF, and the integrity-score branches here — with one variant rounded for
+// display and one raw for the >150/>200 threshold checks. Consolidating into
+// one helper keeps the math (and the divide-by-zero guard from §6.8) in lockstep
+// across every surface. Drift-prevention sibling of the prior `getScoreLabel` /
+// `countWords` / `buildEmbedSnippets` / `getSiteUrl` / `buildVerifyUrl`
+// consolidations. Display sites round the result.
+export function computeWpm(wordCount: number, writingTimeMs: number): number {
+  if (writingTimeMs <= 0) return 0;
+  return (wordCount / writingTimeMs) * 60000;
+}
+
 export function calculateIntegrityScore(metrics: WritingMetrics, wordCount: number, writingTimeMs: number): number {
   let score = 100;
-  
+
   // Penalize if blocked pastes occurred
   if (metrics.blockedPastes > 0) {
     score -= Math.min(30, metrics.blockedPastes * 10);
   }
-  
+
   // Check if typing speed is humanly plausible (40-150 WPM typical)
-  const wpm = writingTimeMs > 0 ? (wordCount / writingTimeMs) * 60000 : 0;
+  const wpm = computeWpm(wordCount, writingTimeMs);
   if (wpm > 200) {
     score -= 40; // Almost certainly not human-typed
   } else if (wpm > 150) {

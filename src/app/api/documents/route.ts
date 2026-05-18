@@ -49,6 +49,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Cap the keystroke trace at a generous-but-bounded size. A real human
+    // session — even a 5,000-word essay typed character-by-character — runs
+    // ~30k events; 250k is ~8× the longest plausible writing window. Without a
+    // cap, a direct API caller could POST a multi-million-event trace, balloon
+    // the `keystroke_data` JSONB column (Neon's row-size limits are generous
+    // but not infinite), and tank /verify/<hash> playback for that hash on every
+    // pageload. Trust-boundary fix paralleling the prior server-side wordCount
+    // (§6.15), title (§6.19), and writingTimeMs (§6.20) sanitization — the
+    // server is the canonical source for what it admits.
+    const MAX_TRACE_EVENTS = 250_000;
+    if (session.events.length > MAX_TRACE_EVENTS) {
+      return NextResponse.json(
+        { error: `Keystroke trace exceeds maximum allowed size (${MAX_TRACE_EVENTS} events)` },
+        { status: 413 }
+      );
+    }
+
     const docId = nanoid();
     const verificationHash = generateVerificationHash();
     // Sanitize the writing window server-side. A direct API caller could send

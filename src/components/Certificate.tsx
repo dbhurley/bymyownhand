@@ -2,7 +2,7 @@
 
 import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
 import type { WritingMetrics } from '@/lib/types';
-import { formatDuration } from '@/lib/metrics';
+import { computeWpm, formatDuration } from '@/lib/metrics';
 import { getSiteUrl } from '@/lib/site';
 
 // Register fonts
@@ -200,7 +200,7 @@ export function Certificate({
   qrCodeDataUrl,
 }: CertificateProps) {
   const verifyUrl = `${getSiteUrl()}/verify/${verificationHash}`;
-  const wpm = writingTimeMs > 0 ? Math.round((wordCount / writingTimeMs) * 60000) : 0;
+  const wpm = Math.round(computeWpm(wordCount, writingTimeMs));
 
   return (
     <Document>

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getAllPosts, getFeaturedPost, getCategories, getAllTags } from '@/lib/blog';
+import { getAllPosts, getFeaturedPost, getCategories, getAllTags, visibleTags } from '@/lib/blog';
 import { getSiteUrl } from '@/lib/site';
 import type { Metadata } from 'next';
 
@@ -100,7 +100,7 @@ export default function BlogPage() {
                     {featured.excerpt}
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {filterTags(featured.tags).slice(0, 3).map(tag => (
+                    {visibleTags(featured.tags).slice(0, 3).map(tag => (
                       <span key={tag} className="blog-tag blog-tag-light">{tag}</span>
                     ))}
                   </div>
@@ -168,7 +168,7 @@ export default function BlogPage() {
                   {category.posts.slice(0, 4).map(post => (
                     <Link key={post.slug} href={`/blog/${post.slug}`} className="blog-card group">
                       <div className="flex flex-wrap gap-2 mb-3">
-                        {filterTags(post.tags).slice(0, 2).map(tag => (
+                        {visibleTags(post.tags).slice(0, 2).map(tag => (
                           <span key={tag} className={`blog-tag blog-tag-${category.color}`}>{tag}</span>
                         ))}
                         <span className="text-xs text-deep-blue/30">{post.date}</span>
@@ -259,10 +259,6 @@ export default function BlogPage() {
       </section>
     </>
   );
-}
-
-function filterTags(tags: string[]): string[] {
-  return tags.filter(t => !['ByMyOwnHand', 'Next.js'].includes(t));
 }
 
 function formatDate(dateStr: string): string {

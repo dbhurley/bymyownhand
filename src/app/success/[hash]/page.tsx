@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import type { WritingSession } from '@/lib/types';
-import { formatDuration, getScoreLabel } from '@/lib/metrics';
+import { computeWpm, formatDuration, getScoreLabel } from '@/lib/metrics';
 import { buildEmbedSnippets } from '@/lib/embed';
 import { recordCertification, type StreakSummary } from '@/lib/history';
 import { buildVerifyUrl } from '@/lib/site';
@@ -76,9 +76,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
 
   const writingTime = session ? (session.endedAt || Date.now()) - session.startedAt : 0;
   const scoreInfo = session ? getScoreLabel(session.integrityScore || 0) : { label: '', color: '' };
-  const wpm = session && writingTime > 0
-    ? Math.round((session.wordCount / writingTime) * 60000)
-    : 0;
+  const wpm = session ? Math.round(computeWpm(session.wordCount, writingTime)) : 0;
 
   return (
     <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
