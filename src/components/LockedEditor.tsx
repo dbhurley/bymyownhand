@@ -26,7 +26,22 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
   const [content, setContent] = useState(initialDraft?.content ?? '');
   const [wordCount, setWordCount] = useState(0);
   const [sessionId] = useState(() => initialDraft?.sessionId ?? nanoid());
-  const [startTime] = useState(() => initialDraft?.startTime ?? Date.now());
+  // Rebase the session's logical start when resuming a draft so the wall-clock
+  // gap between the last saved event and the first resumed keystroke doesn't
+  // count as a multi-hour "pause." Keystroke events use `t = Date.now() - startTime`,
+  // so anchoring `startTime` at `Date.now() - lastEventT - 1ms` makes the first
+  // resumed event land 1ms after the last saved one — preserving the writing
+  // session as one continuous trace. Without this, a draft resumed 23h later
+  // inflated `avgKeystrokeInterval` by ~80M ms, added a bogus pause to
+  // `pauseCount`, and the elapsed-time display showed "23h" instead of the
+  // actual writing time. The original `startedAt` is preserved separately so
+  // the certified record still reports the real wall-clock start.
+  const [startTime] = useState(() => {
+    if (!initialDraft) return Date.now();
+    const lastEventT = initialDraft.events.reduce<number>((max, ev) => ev.t > max ? ev.t : max, 0);
+    return Date.now() - lastEventT - 1;
+  });
+  const [startedAt] = useState(() => initialDraft?.startTime ?? Date.now());
   const [elapsedTime, setElapsedTime] = useState(0);
   const [blockedPasteCount, setBlockedPasteCount] = useState(() => initialDraft?.blockedPasteCount ?? 0);
   const [isRecording, setIsRecording] = useState(true);
@@ -201,7 +216,10 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
         title: t,
         content: c,
         events: eventsRef.current,
-        startTime,
+        // Persist the original wall-clock start so resuming reconstructs the
+        // session's true `startedAt`; the rebased `startTime` is a runtime-only
+        // offset for keystroke timing math.
+        startTime: startedAt,
         blockedPasteCount: b,
         savedAt: Date.now(),
       };
@@ -218,7 +236,7 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
       window.clearInterval(interval);
       window.removeEventListener('beforeunload', persist);
     };
-  }, [sessionId, startTime, isRecording]);
+  }, [sessionId, startedAt, isRecording]);
 
   const handleSubmit = () => {
     if (isSubmitting) return;
@@ -229,8 +247,16 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
 
     const session: WritingSession = {
       id: sessionId,
-      startedAt: startTime,
-      endedAt: Date.now(),
+      // Preserve the original wall-clock start (the moment the writer first
+      // opened the editor) so the certified record reflects when the piece
+      // actually began. The server recomputes `writingTimeMs` from
+      // `(endedAt - startedAt)`, so emit `endedAt = startedAt + elapsedTime`
+      // — yielding the *active* writing window (resume gap excluded) which
+      // matches what the keystroke trace and integrity score reflect. Without
+      // this, a 23h-old resumed draft would persist a 23h+ writing window and
+      // tarnish WPM, the Duration cell, and the certificate PDF.
+      startedAt,
+      endedAt: startedAt + elapsedTime,
       events: eventsRef.current,
       metrics,
       content,

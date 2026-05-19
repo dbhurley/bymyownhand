@@ -19,12 +19,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
     if (isNaN(d.getTime())) return latest;
     return d > latest ? d : latest;
   }, new Date(0));
-  const blogLastModified = latestPostDate.getTime() > 0 ? latestPostDate : now;
+  const contentLastModified = latestPostDate.getTime() > 0 ? latestPostDate : now;
 
+  // Anchor `/` and `/write` to content freshness rather than `now` — the prior
+  // revision already corrected this freshness lie for `/blog`, but `/` and
+  // `/write` were still emitting `now` on every crawl. The homepage features
+  // the blog and the recently-certified surface, so its meaningful freshness
+  // signal is the latest blog post date. `/write` is a stable editor surface
+  // — its content rarely changes — so anchoring it to the latest post date is
+  // a conservative under-promise that still falls back to the real "site has
+  // new content" cadence. Search engines now spend crawl budget when the site
+  // actually changed instead of re-fetching unchanged surfaces every visit.
   const staticEntries: MetadataRoute.Sitemap = [
-    { url: `${base}/`, lastModified: now, changeFrequency: 'weekly', priority: 1 },
-    { url: `${base}/write`, lastModified: now, changeFrequency: 'monthly', priority: 0.9 },
-    { url: `${base}/blog`, lastModified: blogLastModified, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${base}/`, lastModified: contentLastModified, changeFrequency: 'weekly', priority: 1 },
+    { url: `${base}/write`, lastModified: contentLastModified, changeFrequency: 'monthly', priority: 0.9 },
+    { url: `${base}/blog`, lastModified: contentLastModified, changeFrequency: 'weekly', priority: 0.8 },
   ];
 
   // Skip posts whose date is missing or unparseable rather than advertising

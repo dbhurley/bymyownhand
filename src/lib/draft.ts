@@ -21,8 +21,19 @@ export function loadDraft(): DraftSnapshot | null {
   try {
     const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as DraftSnapshot;
-    if (!parsed?.content || typeof parsed.startTime !== 'number') return null;
+    const parsed = JSON.parse(raw) as unknown;
+
+    // Strict schema check. A corrupted or tampered localStorage value
+    // previously slipped past a `parsed?.content && typeof parsed.startTime === 'number'`
+    // check, leaving downstream code (LockedEditor's resume timeline rebase,
+    // calculateMetrics, the autosave persist that reuses the snapshot's
+    // sessionId) to crash on a missing `events` array, a non-string title,
+    // or a non-numeric `savedAt` / `blockedPasteCount`. We'd rather discard a
+    // bad draft and start fresh than half-restore a broken one.
+    if (!isValidDraftSnapshot(parsed)) {
+      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+      return null;
+    }
     if (Date.now() - parsed.savedAt > DRAFT_MAX_AGE_MS) {
       window.localStorage.removeItem(DRAFT_STORAGE_KEY);
       return null;
@@ -31,6 +42,23 @@ export function loadDraft(): DraftSnapshot | null {
   } catch {
     return null;
   }
+}
+
+function isValidDraftSnapshot(value: unknown): value is DraftSnapshot {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.sessionId === 'string' &&
+    typeof v.title === 'string' &&
+    typeof v.content === 'string' &&
+    Array.isArray(v.events) &&
+    typeof v.startTime === 'number' &&
+    Number.isFinite(v.startTime) &&
+    typeof v.blockedPasteCount === 'number' &&
+    Number.isFinite(v.blockedPasteCount) &&
+    typeof v.savedAt === 'number' &&
+    Number.isFinite(v.savedAt)
+  );
 }
 
 export function clearDraft() {
