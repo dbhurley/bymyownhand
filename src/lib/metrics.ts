@@ -145,10 +145,18 @@ export function getScoreLabel(score: number): ScoreLabel {
 }
 
 export function formatDuration(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
+  // Clamp non-finite or negative inputs to 0. Without this, a legacy or
+  // tampered record with `writingTimeMs = NaN` (or negative — a clock that
+  // ran backwards between startedAt and endedAt before the §6.20 server-side
+  // sanitization landed) renders as "NaNs" / "-1s" in the verify Duration cell,
+  // the success page, the certificate PDF, and the toolbar timer. Match the
+  // shape of the server-side `writingTimeMs` trust-boundary fix (§6.20) on the
+  // display side so a single bad value can't surface anywhere.
+  const safeMs = Number.isFinite(ms) && ms > 0 ? ms : 0;
+  const seconds = Math.floor(safeMs / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes % 60}m`;
   } else if (minutes > 0) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDocumentByHash } from '@/lib/db';
+import { isValidVerificationHash } from '@/lib/hash';
 
 export async function GET(
   request: NextRequest,
@@ -12,6 +13,20 @@ export async function GET(
       return NextResponse.json(
         { error: 'Missing verification hash' },
         { status: 400 }
+      );
+    }
+
+    // Reject obviously-invalid hash strings before touching Neon. The route
+    // used to issue a `SELECT * FROM documents WHERE verification_hash = $1`
+    // for any input, so a misbehaving client (or a crawler hitting random
+    // /verify/<garbage> URLs) could spend the database's roundtrip budget on
+    // inputs that can't have been minted by `generateVerificationHash()`.
+    // Same trust-boundary shape as the prior server-side `wordCount`, `title`,
+    // `writingTimeMs`, and trace-size gates.
+    if (!isValidVerificationHash(hash)) {
+      return NextResponse.json(
+        { error: 'Document not found' },
+        { status: 404 }
       );
     }
 

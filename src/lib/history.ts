@@ -5,6 +5,8 @@
 // Phase 1.2 the same shape will sync server-side; until then this is enough
 // to start the habit-formation feedback loop.
 
+import { isValidVerificationHash } from './hash';
+
 const HISTORY_STORAGE_KEY = 'bmoh:history:v1';
 const MAX_ENTRIES = 500;
 
@@ -27,11 +29,27 @@ function readHistory(): CertificationRecord[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
+    // `typeof x === 'number'` accepts NaN, Infinity, and negative values — any
+    // of which can leak past the filter and poison `summarize()`: a NaN
+    // certifiedAt produces a `NaN-NaN-NaN` dayKey that doesn't match anything,
+    // but a negative one becomes a real Date in 1969 that contributes a
+    // phantom day to the streak set. Treat the localStorage payload as
+    // untrusted and require finite, non-negative numerics — same trust-boundary
+    // shape as the strict draft-snapshot check in `lib/draft.ts` and the
+    // server-side `wordCount` / `title` / `writingTimeMs` gates.
     return parsed.filter((r): r is CertificationRecord =>
       typeof r?.hash === 'string' &&
+      isValidVerificationHash(r.hash) &&
       typeof r?.certifiedAt === 'number' &&
+      Number.isFinite(r.certifiedAt) &&
+      r.certifiedAt > 0 &&
       typeof r?.wordCount === 'number' &&
-      typeof r?.integrityScore === 'number'
+      Number.isFinite(r.wordCount) &&
+      r.wordCount >= 0 &&
+      typeof r?.integrityScore === 'number' &&
+      Number.isFinite(r.integrityScore) &&
+      r.integrityScore >= 0 &&
+      r.integrityScore <= 100
     );
   } catch {
     return [];
@@ -48,14 +66,33 @@ function writeHistory(history: CertificationRecord[]) {
 }
 
 // Idempotent: recording the same hash twice (e.g. a re-visit to /success)
-// won't double-count.
+// won't double-count. The record is also sanitized at the entry point — the
+// caller is the `/success/<hash>` page, which falls back to `0` for missing
+// numerics via `|| 0`, but a future caller (or a corrupt sessionStorage
+// payload) could pass NaN / Infinity / negative values that would round-trip
+// through `writeHistory` and re-emerge through `readHistory`'s filter. Same
+// trust-boundary principle as the strict draft-snapshot check.
 export function recordCertification(record: CertificationRecord): StreakSummary {
   const history = readHistory();
+  if (!isRecordSafe(record)) return summarize(history);
   if (!history.some(r => r.hash === record.hash)) {
     history.push(record);
     writeHistory(history);
   }
   return summarize(history);
+}
+
+function isRecordSafe(record: CertificationRecord): boolean {
+  return (
+    isValidVerificationHash(record.hash) &&
+    Number.isFinite(record.certifiedAt) &&
+    record.certifiedAt > 0 &&
+    Number.isFinite(record.wordCount) &&
+    record.wordCount >= 0 &&
+    Number.isFinite(record.integrityScore) &&
+    record.integrityScore >= 0 &&
+    record.integrityScore <= 100
+  );
 }
 
 export function getStreakSummary(): StreakSummary {
