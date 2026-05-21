@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import type { WritingSession } from '@/lib/types';
-import { computeWpm, formatDuration, getScoreLabel } from '@/lib/metrics';
+import { computeWpm, formatDuration, getScoreLabel, getSessionWritingTime } from '@/lib/metrics';
 import { buildEmbedSnippets } from '@/lib/embed';
 import { recordCertification, type StreakSummary } from '@/lib/history';
 import { buildVerifyUrl } from '@/lib/site';
@@ -42,8 +42,20 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
       router.replace(`/verify/${hash}`);
       return;
     }
-    const parsed: SessionData = JSON.parse(stored);
-    if (parsed.verificationHash !== hash) {
+    // Treat the sessionStorage payload as untrusted: a corrupted or partially-
+    // written value would otherwise throw an uncaught JSON.parse error inside
+    // this effect, leaving the writer staring at a blank screen with no path
+    // forward. Same trust-boundary principle as the strict draft-schema check
+    // in `lib/draft.ts` and the strict numeric filter in `lib/history.ts` —
+    // fall back to `/verify/<hash>` rather than half-restore a broken record.
+    let parsed: SessionData | null = null;
+    try {
+      parsed = JSON.parse(stored) as SessionData;
+    } catch {
+      router.replace(`/verify/${hash}`);
+      return;
+    }
+    if (!parsed || parsed.verificationHash !== hash) {
       router.replace(`/verify/${hash}`);
       return;
     }
@@ -74,7 +86,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
   const embeds = buildEmbedSnippets(verifyUrl);
   const embedSnippet = embedFormat === 'markdown' ? embeds.markdown : embeds.html;
 
-  const writingTime = session ? (session.endedAt || Date.now()) - session.startedAt : 0;
+  const writingTime = session ? getSessionWritingTime(session) : 0;
   const scoreInfo = session ? getScoreLabel(session.integrityScore || 0) : { label: '', color: '' };
   const wpm = session ? Math.round(computeWpm(session.wordCount, writingTime)) : 0;
 

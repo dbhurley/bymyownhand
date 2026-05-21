@@ -163,12 +163,6 @@ const styles = StyleSheet.create({
   qrSection: {
     alignItems: 'center',
   },
-  qrPlaceholder: {
-    width: 80,
-    height: 80,
-    backgroundColor: '#1e3a5f',
-    borderRadius: 4,
-  },
   timestamp: {
     fontSize: 9,
     color: '#1e3a5f',

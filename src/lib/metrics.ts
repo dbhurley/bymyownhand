@@ -144,6 +144,29 @@ export function getScoreLabel(score: number): ScoreLabel {
   return { label: 'Low', color: 'text-red-600' };
 }
 
+// Single source of truth for deriving a session's writing-time-in-ms from the
+// in-app `WritingSession` payload that lives in `sessionStorage` on /success
+// and /verify. The `(endedAt || Date.now()) - startedAt` pattern was duplicated
+// on both pages and silently disagrees with the server-side `writingTimeMs`
+// whenever `endedAt` is missing — the `Date.now()` fallback resolves to "now,"
+// which on a refreshed `/verify` tab can be hours after the session ended,
+// ballooning the Duration cell and WPM. Applies the same `Number.isFinite()` /
+// non-negative clamp as `formatDuration()` so a corrupt sessionStorage payload
+// (or a future caller passing partial data) can never surface as a negative or
+// NaN duration. Drift-prevention sibling of the prior `computeWpm()` /
+// `getScoreLabel()` / `countWords()` / `buildEmbedSnippets()` consolidations.
+export function getSessionWritingTime(session: {
+  startedAt: number | undefined;
+  endedAt?: number;
+}): number {
+  const startedAt = Number(session.startedAt);
+  if (!Number.isFinite(startedAt) || startedAt <= 0) return 0;
+  const endedAt = Number(session.endedAt);
+  const end = Number.isFinite(endedAt) && endedAt > 0 ? endedAt : Date.now();
+  const window = end - startedAt;
+  return Number.isFinite(window) && window > 0 ? window : 0;
+}
+
 export function formatDuration(ms: number): string {
   // Clamp non-finite or negative inputs to 0. Without this, a legacy or
   // tampered record with `writingTimeMs = NaN` (or negative — a clock that

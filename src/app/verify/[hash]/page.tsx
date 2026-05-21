@@ -3,7 +3,7 @@
 import { useEffect, useState, use, useRef } from 'react';
 import Link from 'next/link';
 import type { WritingMetrics, KeystrokeEvent } from '@/lib/types';
-import { calculateIntegrityScore, computeWpm, formatDuration, getScoreLabel } from '@/lib/metrics';
+import { calculateIntegrityScore, computeWpm, formatDuration, getScoreLabel, getSessionWritingTime } from '@/lib/metrics';
 import { buildVerifyUrl } from '@/lib/site';
 import { buildEmbedSnippets } from '@/lib/embed';
 import { buildLinkedInShareUrl, buildTweetUrl } from '@/lib/share';
@@ -48,7 +48,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
             title: session.title,
             content: session.content,
             wordCount: session.wordCount,
-            writingTimeMs: (session.endedAt || Date.now()) - session.startedAt,
+            writingTimeMs: getSessionWritingTime(session),
             verificationHash: hash,
             status: 'certified',
             createdAt: new Date(session.startedAt).toISOString(),
@@ -441,6 +441,31 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
         <div className="pt-8 border-t border-deep-blue/[0.06] text-center">
           <span className="text-xs text-deep-blue/30 uppercase tracking-wider">Verification Hash</span>
           <p className="font-mono text-sm text-deep-blue/60 mt-1 break-all">{hash}</p>
+        </div>
+
+        {/* Visitor CTA — every /verify pageload is a cold embed touch (a reader
+            arriving from a Substack post, a WordPress blog, an email signature
+            badge). Closing the embed flywheel means converting some fraction of
+            those visitors into writers themselves, but the page previously had
+            no path forward for a verifier — only a verification hash, then the
+            footer. A calm "Try it yourself" line completes the loop the
+            Phase 1.3 embed badge initiates: badge in the wild → cold visit to
+            /verify → writer's-own certified piece → another badge in the wild.
+            Sticks alongside the future Phase 1.5 "How we verified this"
+            explainer rather than replacing it. */}
+        <div className="mt-12 text-center">
+          <p className="text-deep-blue/50 text-sm mb-4">
+            Want proof your own writing is human?
+          </p>
+          <Link
+            href="/write"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-deep-blue text-cream rounded-full font-medium text-sm hover:bg-deep-blue/90 transition-colors"
+          >
+            Write your own proof
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
         </div>
       </main>
     </div>
