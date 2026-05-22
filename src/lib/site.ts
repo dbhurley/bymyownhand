@@ -23,3 +23,16 @@ export function buildVerifyUrl(hash: string): string {
   }
   return `${getSiteUrl()}/verify/${hash}`;
 }
+
+// Canonical /verify/<hash> URL that always resolves through getSiteUrl(),
+// never the browser origin. Used where the URL is baked into a durable
+// artifact that outlives the page that minted it — the POST /api/documents
+// response handed to external API consumers, the PDF certificate's footer
+// link, and the certificate QR code. Those must point at the canonical domain
+// regardless of which preview host or custom domain the writer happened to be
+// on. Distinct from buildVerifyUrl(), which prefers window.location.origin so
+// an in-app share link points back at the surface the writer is actually on.
+// Previously inlined as `${getSiteUrl()}/verify/${hash}` in three places.
+export function getCanonicalVerifyUrl(hash: string): string {
+  return `${getSiteUrl()}/verify/${hash}`;
+}

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
 import { generateVerificationHash } from '@/lib/hash';
 import { createDocument } from '@/lib/db';
-import { getSiteUrl } from '@/lib/site';
+import { getCanonicalVerifyUrl } from '@/lib/site';
 import { countWords } from '@/lib/metrics';
 import type { WritingSession } from '@/lib/types';
 
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
       success: true,
       documentId: docId,
       verificationHash,
-      verifyUrl: `${getSiteUrl()}/verify/${verificationHash}`,
+      verifyUrl: getCanonicalVerifyUrl(verificationHash),
     });
   } catch (error) {
     console.error('Error creating document:', error);

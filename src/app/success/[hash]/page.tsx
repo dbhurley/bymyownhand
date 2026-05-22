@@ -62,9 +62,18 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
     setSession(parsed);
     // Record this certification once (idempotent on hash) and surface the
     // resulting streak/total so the writer sees their habit forming.
+    //
+    // Key the streak on the actual moment of certification (`Date.now()`), not
+    // on `session.endedAt`. The streak counts the calendar days a writer
+    // certified something; `endedAt` is the end of the *active writing window*,
+    // which for a resumed draft is `originalStartedAt + activeDuration` — and
+    // since the resume flow deliberately preserves the original wall-clock
+    // start across a gap of up to 24h, a draft begun yesterday but certified
+    // today would otherwise record yesterday's `dayKey()` and attribute today's
+    // certification to the wrong day (breaking the streak or under-counting it).
     const summary = recordCertification({
       hash: parsed.verificationHash,
-      certifiedAt: parsed.endedAt || Date.now(),
+      certifiedAt: Date.now(),
       wordCount: parsed.wordCount || 0,
       integrityScore: parsed.integrityScore || 0,
     });

@@ -5,7 +5,7 @@ import { pdf } from '@react-pdf/renderer';
 import QRCode from 'qrcode';
 import { Certificate } from './Certificate';
 import type { WritingMetrics } from '@/lib/types';
-import { getSiteUrl } from '@/lib/site';
+import { getCanonicalVerifyUrl } from '@/lib/site';
 
 interface DownloadCertificateProps {
   title: string;
@@ -31,7 +31,7 @@ export function DownloadCertificate({
     
     try {
       // Generate QR code
-      const verifyUrl = `${getSiteUrl()}/verify/${verificationHash}`;
+      const verifyUrl = getCanonicalVerifyUrl(verificationHash);
       const qrCodeDataUrl = await QRCode.toDataURL(verifyUrl, {
         width: 200,
         margin: 1,

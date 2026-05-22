@@ -3,7 +3,7 @@
 import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
 import type { WritingMetrics } from '@/lib/types';
 import { computeWpm, formatDuration } from '@/lib/metrics';
-import { getSiteUrl } from '@/lib/site';
+import { getCanonicalVerifyUrl } from '@/lib/site';
 
 // Register fonts
 Font.register({
@@ -193,7 +193,7 @@ export function Certificate({
   certifiedAt,
   qrCodeDataUrl,
 }: CertificateProps) {
-  const verifyUrl = `${getSiteUrl()}/verify/${verificationHash}`;
+  const verifyUrl = getCanonicalVerifyUrl(verificationHash);
   const wpm = Math.round(computeWpm(wordCount, writingTimeMs));
 
   return (

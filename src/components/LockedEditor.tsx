@@ -242,25 +242,38 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
     if (isSubmitting) return;
     setIsRecording(false);
 
+    // Compute the writing window and word count live at submit time rather than
+    // reading the React state. `elapsedTime` is refreshed only once per second
+    // by the interval, so a writer who hits Complete within the first second
+    // (or between ticks) would submit a window truncated by up to ~1s — or 0
+    // before the first tick — which deflates the Duration cell, zeroes the WPM
+    // stat, and silently skips the >150/>200 WPM penalty in the integrity
+    // score. `Date.now() - startTime` is the same source the interval samples,
+    // just read at the precise moment of submission. `wordCount` state is
+    // likewise effect-synced; recompute from `content` so the certified count
+    // can't lag a final keystroke.
+    const activeWritingTime = Date.now() - startTime;
+    const finalWordCount = countWords(content);
+
     const metrics = calculateMetrics(eventsRef.current, content);
-    const integrityScore = calculateIntegrityScore(metrics, wordCount, elapsedTime);
+    const integrityScore = calculateIntegrityScore(metrics, finalWordCount, activeWritingTime);
 
     const session: WritingSession = {
       id: sessionId,
       // Preserve the original wall-clock start (the moment the writer first
       // opened the editor) so the certified record reflects when the piece
       // actually began. The server recomputes `writingTimeMs` from
-      // `(endedAt - startedAt)`, so emit `endedAt = startedAt + elapsedTime`
+      // `(endedAt - startedAt)`, so emit `endedAt = startedAt + activeWritingTime`
       // — yielding the *active* writing window (resume gap excluded) which
       // matches what the keystroke trace and integrity score reflect. Without
       // this, a 23h-old resumed draft would persist a 23h+ writing window and
       // tarnish WPM, the Duration cell, and the certificate PDF.
       startedAt,
-      endedAt: startedAt + elapsedTime,
+      endedAt: startedAt + activeWritingTime,
       events: eventsRef.current,
       metrics,
       content,
-      wordCount,
+      wordCount: finalWordCount,
       integrityScore,
     };
 
