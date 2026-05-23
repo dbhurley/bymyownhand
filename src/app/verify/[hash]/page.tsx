@@ -4,6 +4,7 @@ import { useEffect, useState, use, useRef } from 'react';
 import Link from 'next/link';
 import type { WritingMetrics, KeystrokeEvent } from '@/lib/types';
 import { calculateIntegrityScore, computeWpm, formatDuration, getScoreLabel, getSessionWritingTime } from '@/lib/metrics';
+import { isValidVerificationHash } from '@/lib/hash';
 import { buildVerifyUrl } from '@/lib/site';
 import { buildEmbedSnippets } from '@/lib/embed';
 import { buildLinkedInShareUrl, buildTweetUrl } from '@/lib/share';
@@ -38,11 +39,38 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   const playbackRef = useRef<number | null>(null);
 
   useEffect(() => {
+    // Mirror the server-side hash-format gate in GET /api/documents/[hash]:
+    // reject obviously-invalid hashes (a crawler hitting /verify/<garbage>, a
+    // truncated share link) before touching sessionStorage or spending an API
+    // round-trip. A real `bmoh-xxxx-xxxx-xxxx` hash always passes, so the
+    // writer's own just-certified fast-path is unaffected. Trust-boundary
+    // parity with the server, applied at the client edge.
+    if (!isValidVerificationHash(hash)) {
+      setError('Document not found');
+      setLoading(false);
+      return;
+    }
+
     const stored = sessionStorage.getItem('lastSession');
     if (stored) {
       try {
         const session = JSON.parse(stored);
-        if (session.verificationHash === hash) {
+        // Only take the sessionStorage fast-path when the payload is for this
+        // hash *and* carries the fields the page reads. A corrupt or partial
+        // `lastSession` (a quota-exceeded write, a tab killed mid-setItem, a
+        // manually-edited value) used to slip through on a hash match alone,
+        // then throw a RangeError at `new Date(session.startedAt).toISOString()`
+        // for a non-finite `startedAt` — silently dropping the writer to the
+        // API path, which on the no-DB MVP flow returns 404 for their own
+        // freshly-certified document. Validate first; fall through to the API
+        // on any mismatch. Same trust-boundary principle as the strict parse
+        // on /success (§6.24) and the strict draft/history schema checks.
+        if (
+          session?.verificationHash === hash &&
+          typeof session.content === 'string' &&
+          typeof session.startedAt === 'number' &&
+          Number.isFinite(session.startedAt)
+        ) {
           setDocument({
             id: session.documentId,
             title: session.title,
@@ -324,6 +352,44 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
             )}
           </div>
         </div>
+
+        {/* How we verified this — a calm explainer for first-time visitors who
+            arrived via a shared link or an embed badge and may not know what a
+            keystroke trace actually proves. Phase 1.5 item: educating the cold
+            visitor is the first step in converting an embed touch into a writer
+            of their own (the embed flywheel the "Write your own proof" CTA
+            below closes). A native <details> adds no JS and is keyboard- and
+            screen-reader-accessible by default. */}
+        <details className="group bg-white rounded-2xl border border-deep-blue/[0.06] mb-8 overflow-hidden">
+          <summary className="flex items-center justify-between px-5 md:px-6 py-4 cursor-pointer list-none select-none">
+            <span className="text-sm font-semibold text-deep-blue">How we verified this</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-deep-blue/40 transition-transform group-open:rotate-180" aria-hidden="true">
+              <path d="M4 6L8 10L12 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </summary>
+          <div className="px-5 md:px-6 pb-6 pt-1 space-y-4 text-sm text-deep-blue/55 leading-relaxed border-t border-deep-blue/[0.04]">
+            <p>
+              This piece was composed in a locked editor that recorded every keystroke with millisecond timing — we certify the act of writing, not the finished text alone.
+            </p>
+            <ul className="space-y-2.5">
+              <li className="flex gap-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-deep-blue/20 flex-shrink-0 mt-[0.5rem]" />
+                <span><span className="font-medium text-deep-blue/70">Every keystroke is timed.</span> The rhythm, thinking pauses, and corrections shown above are reconstructed from the trace, not estimated.</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-deep-blue/20 flex-shrink-0 mt-[0.5rem]" />
+                <span><span className="font-medium text-deep-blue/70">External paste is blocked.</span> Text pasted from outside the editor is rejected and counted — the words had to originate here.</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-deep-blue/20 flex-shrink-0 mt-[0.5rem]" />
+                <span><span className="font-medium text-deep-blue/70">Press Play to watch it written.</span> The playback replays the document character by character at the pace it was actually composed.</span>
+              </li>
+            </ul>
+            <p className="text-deep-blue/45">
+              We capture timing only — never your screen, webcam, or biometrics.
+            </p>
+          </div>
+        </details>
 
         {/* Detailed metrics */}
         {metrics && (
