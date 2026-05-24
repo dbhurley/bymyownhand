@@ -1,4 +1,5 @@
 import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { isValidVerificationHash } from './hash';
 
 // Lazy initialization - only connect when DATABASE_URL is available
 let _sql: NeonQueryFunction<false, false> | null = null;
@@ -73,7 +74,16 @@ export async function initializeDatabase() {
 export async function getDocumentByHash(hash: string) {
   const sql = getSql();
   if (!sql) return null;
-  
+
+  // Defense-in-depth at the data-access boundary: reject inputs that can't
+  // have been minted by generateVerificationHash() before spending a Neon
+  // roundtrip. GET /api/documents/[hash] already gates this at the route, but
+  // this helper is a reusable library function and the documented Phase 2.1
+  // public API (GET /api/v1/verify/<hash>) will be a second caller — enforcing
+  // the same `isValidVerificationHash()` contract once at the query site keeps
+  // every caller honest. Same trust-boundary principle the route applies.
+  if (!isValidVerificationHash(hash)) return null;
+
   const results = await sql`
     SELECT * FROM documents WHERE verification_hash = ${hash}
   `;

@@ -196,13 +196,27 @@ export function getRelatedPosts(currentSlug: string, tags: string[], limit: numb
   return scored.slice(0, limit).map(s => s.post);
 }
 
+// Match a keyword on word boundaries rather than as a bare substring. A plain
+// `includes()` let short keywords pollute their category: "ai" matched
+// "email" / "available" / "campaign" / "training", "git" matched "digital" /
+// "legitimate", and "api" matched "rapidly" / "capital" — silently filing
+// unrelated posts under "AI & Human Oversight" or "Technology & Innovation"
+// and degrading the blog discovery surface (a cross-cutting roadmap
+// investment). Word boundaries keep multi-word phrase keywords ("identity
+// verification", "human oversight") matching intact, since the haystack joins
+// tags and title with spaces.
+function matchesKeyword(haystack: string, keyword: string): boolean {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`\\b${escaped}\\b`).test(haystack);
+}
+
 export function getCategories(): BlogCategory[] {
   const posts = getAllPosts();
 
   return CATEGORY_MAP.map(cat => {
     const catPosts = posts.filter(post => {
       const joined = post.tags.map(t => t.toLowerCase()).join(' ') + ' ' + post.title.toLowerCase();
-      return cat.keywords.some(kw => joined.includes(kw));
+      return cat.keywords.some(kw => matchesKeyword(joined, kw));
     });
     return { ...cat, posts: catPosts };
   }).filter(cat => cat.posts.length > 0);
