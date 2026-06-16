@@ -30,6 +30,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       publishedTime: post.date,
       authors: [authorName],
       tags: post.tags,
+      // Next.js replaces (does not deep-merge) the parent `openGraph` when a
+      // route defines its own, so without this the per-post share card would be
+      // the one surface left image-less after the root default-image fix. Keep
+      // the same default image so blog-post shares render a card like the rest
+      // of the site.
+      images: [{ url: '/icon-512x512.png', width: 512, height: 512, alt: post.title }],
     },
   };
 }

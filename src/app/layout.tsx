@@ -49,11 +49,19 @@ export const metadata: Metadata = {
     siteName: "By My Own Hand",
     type: "website",
     locale: "en_US",
+    // A default share image so social previews render a card instead of a bare
+    // link. The Twitter card was already declared `summary_large_image` but no
+    // image was ever set anywhere, so every share of the marketing site, the
+    // editor, and verification links degraded to a text-only preview — a miss
+    // for sharing, which the PRD lists as a core success metric (each share is
+    // a marketing event). Resolved relative to `metadataBase` above.
+    images: [{ url: "/icon-512x512.png", width: 512, height: 512, alt: "By My Own Hand" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "By My Own Hand",
     description: "Prove your writing is authentically human — keystroke by keystroke.",
+    images: ["/icon-512x512.png"],
   },
   robots: {
     index: true,

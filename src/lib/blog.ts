@@ -185,8 +185,20 @@ export function getRelatedPosts(currentSlug: string, tags: string[], limit: numb
     let score = 0;
     for (const ct of currentTagsLower) {
       for (const pt of postTagsLower) {
-        if (ct === pt) score += 3;
-        else if (ct.includes(pt) || pt.includes(ct)) score += 1;
+        if (ct === pt) {
+          score += 3;
+        } else if (ct && pt && (matchesKeyword(ct, pt) || matchesKeyword(pt, ct))) {
+          // Word-boundary partial match rather than a bare `includes()`. The
+          // substring form awarded a relevance point for unrelated fragments —
+          // "ai" inside "email" / "available", "git" inside "digital" — the
+          // same substring-pollution class the §6.27 getCategories() fix
+          // addressed, here inflating the related-posts list (a blog-discovery
+          // surface) with noise. Word boundaries keep genuine partials intact
+          // ("ai" ↔ "ai-ethics", "api" ↔ "api-first", where the hyphen is a
+          // boundary) while dropping the false matches. Reuses the same
+          // matchesKeyword() helper, so the two surfaces share one definition.
+          score += 1;
+        }
       }
     }
     return { post, score };
