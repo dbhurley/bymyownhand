@@ -281,12 +281,17 @@ export function Certificate({
         </View>
 
         <Text style={styles.timestamp}>
-          Certified on {certifiedAt.toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
+          {/* `certifiedAt` is the moment the PDF is generated (download time),
+              not the true certification timestamp, so the certificate
+              deliberately renders date-granularity only. The previous call
+              also passed `hour`/`minute` options to `toLocaleDateString`, which
+              silently ignores them (they belong to `toLocaleString`) — dead
+              options that advertised a time-precision this line neither renders
+              nor should claim. Dropped in the §6.24 surface-honesty spirit. */}
+          Certified on {certifiedAt.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
             day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
           })}
         </Text>
       </Page>
