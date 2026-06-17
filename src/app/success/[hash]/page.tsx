@@ -96,7 +96,12 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
   const embedSnippet = embedFormat === 'markdown' ? embeds.markdown : embeds.html;
 
   const writingTime = session ? getSessionWritingTime(session) : 0;
-  const scoreInfo = session ? getScoreLabel(session.integrityScore || 0) : { label: '', color: '' };
+  // Fall back to a real text-color class, not an empty string, for the brief
+  // render before a cold/no-session load is redirected to /verify (§6.14).
+  // An empty `color` produced `className="text-2xl font-bold  mb-0.5"` — a
+  // dangling double-space with no color, so the placeholder score flashed in
+  // default black instead of the muted tone every other empty-state uses.
+  const scoreInfo = session ? getScoreLabel(session.integrityScore || 0) : { label: '', color: 'text-deep-blue/30' };
   const wpm = session ? Math.round(computeWpm(session.wordCount, writingTime)) : 0;
 
   return (
@@ -176,6 +181,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
               type="text"
               readOnly
               value={verifyUrl}
+              aria-label="Verification link"
               className="flex-1 px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-sm font-mono text-cream/80 focus:outline-none"
             />
             <button
