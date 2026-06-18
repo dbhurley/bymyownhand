@@ -189,7 +189,7 @@ Displays:
 - README.md is the default create-next-app template (not updated)
 - No vercel.json configuration file
 - The write flow stores session data in `sessionStorage` to bridge the redirect from `/write` to `/success/[hash]`
-- PWA meta tags are configured (`apple-mobile-web-app-capable`, viewport with `user-scalable=no`)
+- PWA meta tags are configured (`apple-mobile-web-app-capable`, `viewport-fit=cover`). The viewport meta intentionally allows pinch-zoom (no `user-scalable=no` / `maximum-scale`) for WCAG 1.4.4/1.4.10 compliance.
 
 ---
 

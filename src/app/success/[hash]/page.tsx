@@ -10,6 +10,7 @@ import { buildEmbedSnippets } from '@/lib/embed';
 import { recordCertification, type StreakSummary } from '@/lib/history';
 import { buildVerifyUrl } from '@/lib/site';
 import { buildLinkedInShareUrl, buildTweetUrl } from '@/lib/share';
+import { MetricItem } from '@/components/MetricItem';
 
 const DownloadCertificate = dynamic(
   () => import('@/components/DownloadCertificate').then(mod => mod.DownloadCertificate),
@@ -323,26 +324,17 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
           <div className="mt-14">
             <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-6">Writing Analysis</p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-              <Metric label="Avg Keystroke" value={`${session.metrics.avgKeystrokeInterval}ms`} />
-              <Metric label="Variance" value={session.metrics.keystrokeVariance.toFixed(2)} />
-              <Metric label="Thinking Pauses" value={String(session.metrics.pauseCount)} />
-              <Metric label="Deletion Rate" value={`${(session.metrics.deletionRate * 100).toFixed(1)}%`} />
-              <Metric label="Longest Burst" value={`${session.metrics.longestBurst} chars`} />
-              <Metric label="Avg Word Length" value={`${session.metrics.averageWordLength} chars`} />
-              <Metric label="WPM" value={String(wpm)} />
+              <MetricItem label="Avg Keystroke" value={`${session.metrics.avgKeystrokeInterval}ms`} />
+              <MetricItem label="Variance" value={session.metrics.keystrokeVariance.toFixed(2)} />
+              <MetricItem label="Thinking Pauses" value={String(session.metrics.pauseCount)} />
+              <MetricItem label="Deletion Rate" value={`${(session.metrics.deletionRate * 100).toFixed(1)}%`} />
+              <MetricItem label="Longest Burst" value={`${session.metrics.longestBurst} chars`} />
+              <MetricItem label="Avg Word Length" value={`${session.metrics.averageWordLength} chars`} />
+              <MetricItem label="WPM" value={String(wpm)} />
             </div>
           </div>
         )}
       </main>
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span className="text-xs text-deep-blue/35 uppercase tracking-wider block mb-1">{label}</span>
-      <p className="text-xl font-semibold text-deep-blue">{value}</p>
     </div>
   );
 }
