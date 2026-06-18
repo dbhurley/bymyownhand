@@ -77,7 +77,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+        {/* Do NOT pin `maximum-scale=1` / `user-scalable=no` — disabling
+            pinch-zoom is a WCAG 2.1 SC 1.4.4 (Resize Text) / 1.4.10 (Reflow)
+            failure that locks out low-vision readers, and it's flagged by the
+            Lighthouse accessibility audit. Our audience reads long-form prose
+            on `/verify`, the blog, and the editor, so zoom matters. Keep
+            `viewport-fit=cover` for the PWA edge-to-edge layout; let users
+            scale. Accessibility is an always-on cross-cutting investment in
+            the roadmap, alongside the §6.29 verification-link `aria-label`. */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>

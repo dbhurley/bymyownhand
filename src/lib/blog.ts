@@ -204,8 +204,19 @@ export function getRelatedPosts(currentSlug: string, tags: string[], limit: numb
     return { post, score };
   });
 
-  scored.sort((a, b) => b.score - a.score || b.post.date.localeCompare(a.post.date));
-  return scored.slice(0, limit).map(s => s.post);
+  // Only return posts with a real tag relationship. `slice(0, limit)` on the
+  // full sorted list returned `limit` posts unconditionally, so a post whose
+  // tags overlapped *nothing* still surfaced three "Related Articles" — the
+  // same fabricated-relevance class the §6.28 word-boundary partial-match fix
+  // set out to shrink, just at the zero-overlap tail rather than the noisy
+  // partial-match middle. The blog-post page already renders the section behind
+  // `{related.length > 0 && …}`, so dropping the filler hides the section
+  // cleanly rather than showing unrelated posts under a "Related" heading.
+  return scored
+    .filter(s => s.score > 0)
+    .sort((a, b) => b.score - a.score || b.post.date.localeCompare(a.post.date))
+    .slice(0, limit)
+    .map(s => s.post);
 }
 
 // Match a keyword on word boundaries rather than as a bare substring. A plain

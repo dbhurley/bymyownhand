@@ -8,6 +8,7 @@ import { isValidVerificationHash } from '@/lib/hash';
 import { buildVerifyUrl } from '@/lib/site';
 import { buildEmbedSnippets } from '@/lib/embed';
 import { buildLinkedInShareUrl, buildTweetUrl } from '@/lib/share';
+import { MetricItem } from '@/components/MetricItem';
 
 interface DocumentData {
   id: string;
@@ -537,14 +538,4 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
     </div>
   );
 }
-
-function MetricItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span className="text-xs text-deep-blue/35 uppercase tracking-wider block mb-1">{label}</span>
-      <p className="text-xl font-semibold text-deep-blue">{value}</p>
-    </div>
-  );
-}
-
 
