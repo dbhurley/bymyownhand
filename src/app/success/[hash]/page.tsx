@@ -10,7 +10,8 @@ import { buildEmbedSnippets } from '@/lib/embed';
 import { recordCertification, type StreakSummary } from '@/lib/history';
 import { buildVerifyUrl } from '@/lib/site';
 import { buildLinkedInShareUrl, buildTweetUrl } from '@/lib/share';
-import { MetricItem } from '@/components/MetricItem';
+import { writeClipboard } from '@/lib/clipboard';
+import { WritingAnalysis } from '@/components/WritingAnalysis';
 
 const DownloadCertificate = dynamic(
   () => import('@/components/DownloadCertificate').then(mod => mod.DownloadCertificate),
@@ -84,7 +85,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
   const verifyUrl = buildVerifyUrl(hash);
 
   const copyToClipboard = async () => {
-    await navigator.clipboard.writeText(verifyUrl);
+    if (!(await writeClipboard(verifyUrl))) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -275,7 +276,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
             </code>
             <button
               onClick={async () => {
-                await navigator.clipboard.writeText(embedSnippet);
+                if (!(await writeClipboard(embedSnippet))) return;
                 setEmbedCopied(true);
                 setTimeout(() => setEmbedCopied(false), 2000);
               }}
@@ -322,16 +323,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
         {/* Writing analysis */}
         {session?.metrics && (
           <div className="mt-14">
-            <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-6">Writing Analysis</p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-              <MetricItem label="Avg Keystroke" value={`${session.metrics.avgKeystrokeInterval}ms`} />
-              <MetricItem label="Variance" value={session.metrics.keystrokeVariance.toFixed(2)} />
-              <MetricItem label="Thinking Pauses" value={String(session.metrics.pauseCount)} />
-              <MetricItem label="Deletion Rate" value={`${(session.metrics.deletionRate * 100).toFixed(1)}%`} />
-              <MetricItem label="Longest Burst" value={`${session.metrics.longestBurst} chars`} />
-              <MetricItem label="Avg Word Length" value={`${session.metrics.averageWordLength} chars`} />
-              <MetricItem label="WPM" value={String(wpm)} />
-            </div>
+            <WritingAnalysis metrics={session.metrics} wpm={wpm} />
           </div>
         )}
       </main>
