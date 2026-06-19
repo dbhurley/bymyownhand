@@ -8,7 +8,8 @@ import { isValidVerificationHash } from '@/lib/hash';
 import { buildVerifyUrl } from '@/lib/site';
 import { buildEmbedSnippets } from '@/lib/embed';
 import { buildLinkedInShareUrl, buildTweetUrl } from '@/lib/share';
-import { MetricItem } from '@/components/MetricItem';
+import { writeClipboard } from '@/lib/clipboard';
+import { WritingAnalysis } from '@/components/WritingAnalysis';
 
 interface DocumentData {
   id: string;
@@ -227,6 +228,16 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   }
 
   const metrics = document.keystrokeData?.metrics;
+  // Whether this document carries a replayable keystroke trace. A trace-less
+  // document (a legacy record, or one whose `keystroke_data` is null) has no
+  // events to play and no evidence behind the "How we verified this" claims —
+  // so the playback panel's Play button is a dead control and the explainer's
+  // "Press Play to watch it written" / "reconstructed from the trace" lines
+  // describe evidence that isn't here. The §6.10/§6.14 honesty series already
+  // fixed the stat cells ("— / No trace") for this case; this gates the two
+  // remaining trace-dependent surfaces on the same condition.
+  const traceEvents = document.keystrokeData?.events;
+  const hasTrace = Array.isArray(traceEvents) && traceEvents.length > 0;
   // Only compute a score when we actually have a keystroke trace to score
   // against. Falling back to a fabricated number (we used to default to 75)
   // makes legacy or trace-less documents look confidently certified when
@@ -245,13 +256,13 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   const embedSnippet = embedFormat === 'markdown' ? embeds.markdown : embeds.html;
 
   const copyVerifyUrl = async () => {
-    await navigator.clipboard.writeText(verifyUrl);
+    if (!(await writeClipboard(verifyUrl))) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const copyEmbed = async () => {
-    await navigator.clipboard.writeText(embedSnippet);
+    if (!(await writeClipboard(embedSnippet))) return;
     setEmbedCopied(true);
     setTimeout(() => setEmbedCopied(false), 2000);
   };
@@ -326,7 +337,11 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
           </div>
         </div>
 
-        {/* Writing playback */}
+        {/* Writing playback — only when a replayable trace exists. For a
+            trace-less document the Play button does nothing (startPlayback
+            returns early on no events), so rendering the panel presents a dead
+            control. */}
+        {hasTrace && (
         <div className="bg-white rounded-2xl border border-deep-blue/[0.06] overflow-hidden mb-8">
           <div className="flex items-center justify-between px-5 py-3 border-b border-deep-blue/[0.04]">
             <span className="text-xs font-semibold text-deep-blue/35 uppercase tracking-wider">Writing Playback</span>
@@ -353,6 +368,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
             )}
           </div>
         </div>
+        )}
 
         {/* How we verified this — a calm explainer for first-time visitors who
             arrived via a shared link or an embed badge and may not know what a
@@ -360,7 +376,12 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
             visitor is the first step in converting an embed touch into a writer
             of their own (the embed flywheel the "Write your own proof" CTA
             below closes). A native <details> adds no JS and is keyboard- and
-            screen-reader-accessible by default. */}
+            screen-reader-accessible by default. Gated on `hasTrace`: the panel
+            references "shown above" and "Press Play" and asserts the timing was
+            "reconstructed from the trace," so it must not render for a
+            trace-less document where neither the playback nor that evidence
+            exists. */}
+        {hasTrace && (
         <details className="group bg-white rounded-2xl border border-deep-blue/[0.06] mb-8 overflow-hidden">
           <summary className="flex items-center justify-between px-5 md:px-6 py-4 cursor-pointer list-none select-none">
             <span className="text-sm font-semibold text-deep-blue">How we verified this</span>
@@ -391,20 +412,12 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
             </p>
           </div>
         </details>
+        )}
 
         {/* Detailed metrics */}
         {metrics && (
           <div className="mb-8">
-            <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-6">Writing Analysis</p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-              <MetricItem label="Avg Keystroke" value={`${metrics.avgKeystrokeInterval}ms`} />
-              <MetricItem label="Variance" value={metrics.keystrokeVariance.toFixed(2)} />
-              <MetricItem label="Thinking Pauses" value={String(metrics.pauseCount)} />
-              <MetricItem label="Deletion Rate" value={`${(metrics.deletionRate * 100).toFixed(1)}%`} />
-              <MetricItem label="Longest Burst" value={`${metrics.longestBurst} chars`} />
-              <MetricItem label="Avg Word Length" value={`${metrics.averageWordLength} chars`} />
-              <MetricItem label="WPM" value={String(wpm)} />
-            </div>
+            <WritingAnalysis metrics={metrics} wpm={wpm} />
           </div>
         )}
 
