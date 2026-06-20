@@ -29,31 +29,40 @@ function readHistory(): CertificationRecord[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    // `typeof x === 'number'` accepts NaN, Infinity, and negative values — any
-    // of which can leak past the filter and poison `summarize()`: a NaN
-    // certifiedAt produces a `NaN-NaN-NaN` dayKey that doesn't match anything,
-    // but a negative one becomes a real Date in 1969 that contributes a
-    // phantom day to the streak set. Treat the localStorage payload as
-    // untrusted and require finite, non-negative numerics — same trust-boundary
-    // shape as the strict draft-snapshot check in `lib/draft.ts` and the
-    // server-side `wordCount` / `title` / `writingTimeMs` gates.
-    return parsed.filter((r): r is CertificationRecord =>
-      typeof r?.hash === 'string' &&
-      isValidVerificationHash(r.hash) &&
-      typeof r?.certifiedAt === 'number' &&
-      Number.isFinite(r.certifiedAt) &&
-      r.certifiedAt > 0 &&
-      typeof r?.wordCount === 'number' &&
-      Number.isFinite(r.wordCount) &&
-      r.wordCount >= 0 &&
-      typeof r?.integrityScore === 'number' &&
-      Number.isFinite(r.integrityScore) &&
-      r.integrityScore >= 0 &&
-      r.integrityScore <= 100
-    );
+    // Treat the localStorage payload as untrusted: a NaN/Infinity/negative
+    // numeric can leak past a `typeof x === 'number'` check and poison
+    // `summarize()` (a NaN certifiedAt yields a `NaN-NaN-NaN` dayKey that
+    // matches nothing; a negative one becomes a real 1969 Date that adds a
+    // phantom day to the streak set). `isValidRecord()` is the single predicate
+    // shared with the write boundary below — same trust-boundary shape as the
+    // strict draft-snapshot check in `lib/draft.ts` and the server-side
+    // `wordCount` / `title` / `writingTimeMs` gates.
+    return parsed.filter(isValidRecord);
   } catch {
     return [];
   }
+}
+
+// Single source of truth for what a well-formed CertificationRecord looks like,
+// enforced at both trust boundaries: the `readHistory()` filter (untrusted
+// localStorage payload) and the `recordCertification()` write (an untrusted or
+// future caller). `Number.isFinite()` already rejects non-number values, so it
+// doubles as the type guard for the numeric fields. Drift-prevention sibling of
+// the prior `getScoreLabel` / `countWords` / `buildEmbedSnippets` consolidations.
+function isValidRecord(value: unknown): value is CertificationRecord {
+  if (!value || typeof value !== 'object') return false;
+  const r = value as Record<string, unknown>;
+  return (
+    typeof r.hash === 'string' &&
+    isValidVerificationHash(r.hash) &&
+    Number.isFinite(r.certifiedAt) &&
+    (r.certifiedAt as number) > 0 &&
+    Number.isFinite(r.wordCount) &&
+    (r.wordCount as number) >= 0 &&
+    Number.isFinite(r.integrityScore) &&
+    (r.integrityScore as number) >= 0 &&
+    (r.integrityScore as number) <= 100
+  );
 }
 
 function writeHistory(history: CertificationRecord[]) {
@@ -74,25 +83,12 @@ function writeHistory(history: CertificationRecord[]) {
 // trust-boundary principle as the strict draft-snapshot check.
 export function recordCertification(record: CertificationRecord): StreakSummary {
   const history = readHistory();
-  if (!isRecordSafe(record)) return summarize(history);
+  if (!isValidRecord(record)) return summarize(history);
   if (!history.some(r => r.hash === record.hash)) {
     history.push(record);
     writeHistory(history);
   }
   return summarize(history);
-}
-
-function isRecordSafe(record: CertificationRecord): boolean {
-  return (
-    isValidVerificationHash(record.hash) &&
-    Number.isFinite(record.certifiedAt) &&
-    record.certifiedAt > 0 &&
-    Number.isFinite(record.wordCount) &&
-    record.wordCount >= 0 &&
-    Number.isFinite(record.integrityScore) &&
-    record.integrityScore >= 0 &&
-    record.integrityScore <= 100
-  );
 }
 
 export function getStreakSummary(): StreakSummary {
