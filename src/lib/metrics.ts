@@ -20,10 +20,20 @@ export function splitWords(content: string): string[] {
 }
 
 export function calculateMetrics(events: KeystrokeEvent[], content = ''): WritingMetrics {
-  const keyEvents = events.filter(e => e.type === 'key');
-  const deleteEvents = events.filter(e => e.type === 'delete');
-  const blockedPastes = events.filter(e => e.type === 'paste_blocked').length;
-  
+  // Classify the trace in a single pass rather than three separate `.filter()`
+  // sweeps. The trace can be large (up to the 250k-event server cap), so walking
+  // it once instead of three times keeps `/verify/<hash>` playback setup and the
+  // certificate metrics cheap. Only `keyEvents` needs to be materialized as an
+  // ordered array (for interval timing); deletes and blocked pastes need counts.
+  const keyEvents: KeystrokeEvent[] = [];
+  let deleteCount = 0;
+  let blockedPastes = 0;
+  for (const e of events) {
+    if (e.type === 'key') keyEvents.push(e);
+    else if (e.type === 'delete') deleteCount++;
+    else if (e.type === 'paste_blocked') blockedPastes++;
+  }
+
   // Calculate keystroke intervals
   const intervals: number[] = [];
   for (let i = 1; i < keyEvents.length; i++) {
@@ -44,9 +54,9 @@ export function calculateMetrics(events: KeystrokeEvent[], content = ''): Writin
   const pauseCount = intervals.filter(i => i > 2000).length;
   
   // Deletion rate
-  const totalKeystrokes = keyEvents.length + deleteEvents.length;
-  const deletionRate = totalKeystrokes > 0 
-    ? deleteEvents.length / totalKeystrokes 
+  const totalKeystrokes = keyEvents.length + deleteCount;
+  const deletionRate = totalKeystrokes > 0
+    ? deleteCount / totalKeystrokes
     : 0;
   
   // Longest burst (consecutive keystrokes < 500ms apart). Floor at 1 whenever
