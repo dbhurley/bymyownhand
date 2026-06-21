@@ -29,6 +29,30 @@ export async function POST(request: NextRequest) {
     // in §6.15 — the server is the canonical source for what it admits.
     const normalizedTitle = title.trim().slice(0, 200) || 'Untitled Document';
 
+    // Cap the raw content length, completing the trust-boundary series that
+    // already bounds the title (200 chars) and the keystroke trace (250k
+    // events) below. `session.content` was the one unbounded field: a direct
+    // API caller could POST a multi-megabyte string into the `content TEXT`
+    // column and onto every surface that renders it (the verify page, the
+    // certificate PDF). 1,000,000 chars is ~25× the longest plausible essay
+    // (a 5,000-word piece at ~6 chars/word + spaces is ~35k chars), so it
+    // never trips a real writer. Same trust-boundary shape as the prior
+    // server-side wordCount (§6.15), title (§6.19), and trace-size (§6.21) gates.
+    //
+    // This O(1) length check runs *before* the word-count gate below on
+    // purpose: `countWords()` trims and regex-splits the whole string and
+    // allocates an array of every token, so running it first on a rejected
+    // multi-megabyte payload spends real CPU and memory on a request we're
+    // about to 413. Reject on size first, then do the split-based work on
+    // input we've already bounded.
+    const MAX_CONTENT_LENGTH = 1_000_000;
+    if (session.content.length > MAX_CONTENT_LENGTH) {
+      return NextResponse.json(
+        { error: `Document content exceeds maximum allowed size (${MAX_CONTENT_LENGTH} characters)` },
+        { status: 413 }
+      );
+    }
+
     // Mirror the editor's 10-word submission gate so the API can't be used
     // to mint certificates around documents that never met the threshold.
     // Recompute the count server-side rather than trusting the client-supplied
@@ -39,23 +63,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Document must contain at least 10 words to be certified' },
         { status: 400 }
-      );
-    }
-
-    // Cap the raw content length, completing the trust-boundary series that
-    // already bounds the title (200 chars) and the keystroke trace (250k
-    // events) below. `session.content` was the one unbounded field: a direct
-    // API caller could POST a multi-megabyte string into the `content TEXT`
-    // column and onto every surface that renders it (the verify page, the
-    // certificate PDF). 1,000,000 chars is ~25× the longest plausible essay
-    // (a 5,000-word piece at ~6 chars/word + spaces is ~35k chars), so it
-    // never trips a real writer. Same trust-boundary shape as the prior
-    // server-side wordCount (§6.15), title (§6.19), and trace-size (§6.21) gates.
-    const MAX_CONTENT_LENGTH = 1_000_000;
-    if (session.content.length > MAX_CONTENT_LENGTH) {
-      return NextResponse.json(
-        { error: `Document content exceeds maximum allowed size (${MAX_CONTENT_LENGTH} characters)` },
-        { status: 413 }
       );
     }
 

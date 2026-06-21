@@ -32,7 +32,12 @@ export async function GET() {
   const feed = {
     version: 'https://jsonfeed.org/version/1.1',
     title: 'By My Own Hand Blog',
-    home_page_url: siteUrl,
+    // JSON Feed 1.1 defines `home_page_url` as the HTML page the feed
+    // *describes* — for a blog feed that's the blog index a reader lands on
+    // when they click through from their feed reader, not the marketing root.
+    // The feed's title ("…Blog") and `feed_url` (`/api/blog/feed.json`) are
+    // already blog-scoped; point the home page at `/blog` to match.
+    home_page_url: `${siteUrl}/blog`,
     feed_url: `${siteUrl}/api/blog/feed.json`,
     description: 'Insights on human authenticity, writing verification, and identity in the age of AI.',
     language: 'en-US',

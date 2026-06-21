@@ -228,9 +228,29 @@ export function getRelatedPosts(currentSlug: string, tags: string[], limit: numb
 // investment). Word boundaries keep multi-word phrase keywords ("identity
 // verification", "human oversight") matching intact, since the haystack joins
 // tags and title with spaces.
+//
+// The compiled RegExp is memoized per keyword. `matchesKeyword()` is called in
+// nested loops — `getCategories()` tests every category keyword against every
+// post, and `getRelatedPosts()` tests tag pairs across every post — so a single
+// blog-index render would otherwise recompile the same small set of patterns
+// thousands of times. The keyword set is tiny and bounded (the static
+// CATEGORY_MAP keywords plus post tags), so the cache can't grow unbounded.
+// Efficiency sibling of the `getAllPosts()` memoization and the single-pass
+// `calculateMetrics()` classification — keep the hot discovery path cheap.
+const keywordRegexCache = new Map<string, RegExp>();
+
+function keywordRegex(keyword: string): RegExp {
+  let re = keywordRegexCache.get(keyword);
+  if (!re) {
+    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    re = new RegExp(`\\b${escaped}\\b`);
+    keywordRegexCache.set(keyword, re);
+  }
+  return re;
+}
+
 function matchesKeyword(haystack: string, keyword: string): boolean {
-  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`\\b${escaped}\\b`).test(haystack);
+  return keywordRegex(keyword).test(haystack);
 }
 
 export function getCategories(): BlogCategory[] {
