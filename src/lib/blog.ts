@@ -178,10 +178,21 @@ export function getFeaturedPost(): BlogPost | null {
 
 export function getRelatedPosts(currentSlug: string, tags: string[], limit: number = 3): BlogPost[] {
   const posts = getAllPosts().filter(p => p.slug !== currentSlug);
-  const currentTagsLower = tags.map(t => t.toLowerCase());
+  // Score relatedness on *visible* tags only. The corpus tags nearly every post
+  // with the same project-meta boilerplate ("Next.js", "ByMyOwnHand") — the
+  // exact set `isVisibleTag()` already hides from the tag cloud and the post
+  // chips. Left in the scoring, those shared meta tags award a +3 exact-match
+  // between almost every pair of posts, swamping the genuine topical overlap
+  // (also +3) and surfacing subject-unrelated posts under "Related Articles."
+  // Filtering them out before scoring makes relatedness reflect the
+  // subject-matter tags a reader actually cares about. Correctness fix in the
+  // same fabricated-relevance lineage as the §6.28 word-boundary partial-match
+  // fix and the §6.30 zero-overlap-tail filter — those cleaned the noisy middle
+  // and the empty tail; this removes the boilerplate tags that dominated the top.
+  const currentTagsLower = visibleTags(tags).map(t => t.toLowerCase());
 
   const scored = posts.map(post => {
-    const postTagsLower = post.tags.map(t => t.toLowerCase());
+    const postTagsLower = visibleTags(post.tags).map(t => t.toLowerCase());
     let score = 0;
     for (const ct of currentTagsLower) {
       for (const pt of postTagsLower) {
@@ -256,11 +267,22 @@ function matchesKeyword(haystack: string, keyword: string): boolean {
 export function getCategories(): BlogCategory[] {
   const posts = getAllPosts();
 
+  // Build each post's lowercased "tags + title" haystack once, then test every
+  // category against the precomputed string. Previously the haystack was rebuilt
+  // inside the inner `posts.filter` callback, so for N posts and the 5 static
+  // CATEGORY_MAP entries it was lowercased and re-joined 5×N times on every
+  // `/blog` render. Hoisting it out is a single pass over the corpus regardless
+  // of category count. Efficiency sibling of the `getAllPosts()` memoization and
+  // the keyword-regex memoization — keep the blog-discovery hot path cheap.
+  const haystacks = posts.map(post => ({
+    post,
+    haystack: post.tags.map(t => t.toLowerCase()).join(' ') + ' ' + post.title.toLowerCase(),
+  }));
+
   return CATEGORY_MAP.map(cat => {
-    const catPosts = posts.filter(post => {
-      const joined = post.tags.map(t => t.toLowerCase()).join(' ') + ' ' + post.title.toLowerCase();
-      return cat.keywords.some(kw => matchesKeyword(joined, kw));
-    });
+    const catPosts = haystacks
+      .filter(({ haystack }) => cat.keywords.some(kw => matchesKeyword(haystack, kw)))
+      .map(({ post }) => post);
     return { ...cat, posts: catPosts };
   }).filter(cat => cat.posts.length > 0);
 }
