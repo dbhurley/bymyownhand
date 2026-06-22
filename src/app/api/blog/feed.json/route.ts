@@ -45,6 +45,16 @@ export async function GET() {
   };
 
   return NextResponse.json(feed, {
-    headers: { 'Cache-Control': 'public, max-age=3600' },
+    // Mirror the edge-caching the /api/documents/[hash] route uses (§6.13): a
+    // bare `max-age` caches only in the browser — Vercel's Edge Network caches
+    // a Function response only when `s-maxage` (or CDN-Cache-Control) is set.
+    // Without it, every feed-reader poll and crawler hit re-runs this route and
+    // re-serializes the full feed (every post's `content_html`). The feed only
+    // changes when a post is added, so a long edge TTL with stale-while-
+    // revalidate keeps it cheap and fresh. The JSON Feed is a discovery surface
+    // we deliberately keep crawlable and a Phase 4.1 (opt-in feed) surface.
+    headers: {
+      'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400',
+    },
   });
 }
