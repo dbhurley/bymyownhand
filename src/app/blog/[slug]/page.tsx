@@ -20,13 +20,25 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   // since the §6.17 polish. OG metadata was the last surface still flattening
   // every post to a single house byline.
   const authorName = post.author || 'By My Own Hand';
+  const canonicalPath = `/blog/${post.slug}`;
   return {
     title: `${post.title} | By My Own Hand Blog`,
     description: post.excerpt,
+    // Self-referential canonical. The root layout declares
+    // `alternates: { canonical: "/" }`, and Next.js *inherits* a parent's
+    // `alternates` into any child route that doesn't set its own — so every one
+    // of the 44+ blog posts was emitting `<link rel="canonical" href=".../">`,
+    // telling search engines each post is a duplicate of the homepage and
+    // suppressing its own indexing. Point the canonical at the post's own URL.
+    // Resolved against `metadataBase`. Same SEO-honesty lineage as the §6.14–
+    // §6.18 JSON-LD/URL sweeps — make the discovery surface honest.
+    alternates: { canonical: canonicalPath },
     openGraph: {
       title: post.title,
       description: post.excerpt,
       type: 'article',
+      // og:url should be the page's own canonical URL, not the inherited root.
+      url: canonicalPath,
       publishedTime: post.date,
       authors: [authorName],
       tags: post.tags,
@@ -36,6 +48,19 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       // the same default image so blog-post shares render a card like the rest
       // of the site.
       images: [{ url: '/icon-512x512.png', width: 512, height: 512, alt: post.title }],
+    },
+    // Per-post Twitter card. The root layout sets a generic `twitter` block
+    // (title "By My Own Hand", site description), and — like `alternates` —
+    // Next.js inherits it into any route that doesn't override it. X/Twitter
+    // prefers `twitter:*` tags over `og:*`, so every blog-post share rendered
+    // the generic site title/description instead of the post's, even though the
+    // per-post `openGraph` above is correct. Mirror the post's real title,
+    // excerpt, and image so the X card matches the OG card.
+    twitter: {
+      card: 'summary_large_image',
+      title: post.title,
+      description: post.excerpt,
+      images: ['/icon-512x512.png'],
     },
   };
 }
@@ -61,7 +86,14 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   //   - `mainEntityOfPage` and `image` round out the rich-result requirements.
   const siteUrl = getSiteUrl();
   const postUrl = `${siteUrl}/blog/${post.slug}`;
-  const logoUrl = `${siteUrl}/logo.svg`;
+  // Google's structured-data image guidelines accept raster formats (.jpg,
+  // .png, .gif, .webp) but not SVG, for both the Article `image` field and the
+  // publisher `logo`. The site previously pointed both at `/logo.svg`, so
+  // Google dropped them and the post couldn't qualify for the Article rich
+  // result. Use the raster `/icon-512x512.png` — the same image the OG/Twitter
+  // cards already ship — so the structured data is eligible and consistent with
+  // every other share surface. Surface-honesty fix in the §6.14–§6.18 lineage.
+  const imageUrl = `${siteUrl}/icon-512x512.png`;
   const author = post.author
     ? { '@type': 'Person', name: post.author }
     : { '@type': 'Organization', name: 'By My Own Hand' };
@@ -74,12 +106,12 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
     description: post.excerpt,
     keywords: post.tags.join(', '),
     mainEntityOfPage: { '@type': 'WebPage', '@id': postUrl },
-    image: logoUrl,
+    image: imageUrl,
     author,
     publisher: {
       '@type': 'Organization',
       name: 'By My Own Hand',
-      logo: { '@type': 'ImageObject', url: logoUrl },
+      logo: { '@type': 'ImageObject', url: imageUrl },
     },
   };
 
