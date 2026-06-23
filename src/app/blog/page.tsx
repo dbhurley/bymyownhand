@@ -6,10 +6,29 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Blog | By My Own Hand',
   description: 'Insights on human authenticity, writing verification, identity, and the future of trust in a world of AI-generated content.',
+  // Self-referential canonical. The root layout sets `alternates: { canonical:
+  // "/" }`, which Next.js inherits into any route that doesn't override it — so
+  // the blog index was declaring the homepage as its canonical URL, suppressing
+  // its own indexing. Point it at `/blog`. (The per-post pages carry their own.)
+  alternates: { canonical: '/blog' },
   openGraph: {
     title: 'Blog — Written by Hand, Read by All',
     description: 'Exploring authenticity, identity verification, and why human writing still matters in the age of AI.',
+    url: '/blog',
     type: 'website',
+    // Next.js *replaces* (does not deep-merge) the parent `openGraph` when a
+    // route sets its own, so declaring `openGraph` here dropped the root's
+    // default share image and left the blog-index card image-less — the same
+    // §6.28 gap fixed for the per-post pages. Restore the default image.
+    images: [{ url: '/icon-512x512.png', width: 512, height: 512, alt: 'By My Own Hand Blog' }],
+  },
+  // Give the index its own Twitter card so X shows the blog title/description
+  // (and an image) rather than the generic inherited site card.
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Blog — Written by Hand, Read by All',
+    description: 'Exploring authenticity, identity verification, and why human writing still matters in the age of AI.',
+    images: ['/icon-512x512.png'],
   },
 };
 
