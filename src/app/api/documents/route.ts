@@ -53,19 +53,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Mirror the editor's 10-word submission gate so the API can't be used
-    // to mint certificates around documents that never met the threshold.
-    // Recompute the count server-side rather than trusting the client-supplied
-    // `session.wordCount` — a direct API caller could otherwise certify a
-    // 12-word doc while claiming 10,000 words in the persisted record.
-    const serverWordCount = countWords(session.content);
-    if (serverWordCount < 10) {
-      return NextResponse.json(
-        { error: 'Document must contain at least 10 words to be certified' },
-        { status: 400 }
-      );
-    }
-
+    // Validate the keystroke trace *before* the word-count gate. Both trace
+    // checks below are O(1) (an array-type test and a `.length` comparison),
+    // whereas `countWords()` trims and regex-splits the whole content string and
+    // allocates an array of every token — the same O(1)-before-O(n) ordering
+    // rationale that already moved the content-length cap above `countWords`.
+    // A direct API caller sending valid-length prose but a missing or oversized
+    // trace is now rejected without paying the split-based word count first.
     if (!Array.isArray(session.events) || session.events.length === 0) {
       return NextResponse.json(
         { error: 'Keystroke trace is required for certification' },
@@ -87,6 +81,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: `Keystroke trace exceeds maximum allowed size (${MAX_TRACE_EVENTS} events)` },
         { status: 413 }
+      );
+    }
+
+    // Mirror the editor's 10-word submission gate so the API can't be used
+    // to mint certificates around documents that never met the threshold.
+    // Recompute the count server-side rather than trusting the client-supplied
+    // `session.wordCount` — a direct API caller could otherwise certify a
+    // 12-word doc while claiming 10,000 words in the persisted record.
+    const serverWordCount = countWords(session.content);
+    if (serverWordCount < 10) {
+      return NextResponse.json(
+        { error: 'Document must contain at least 10 words to be certified' },
+        { status: 400 }
       );
     }
 
