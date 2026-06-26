@@ -189,8 +189,12 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   if (loading) {
     return (
       <div className="fixed inset-0 bg-cream flex items-center justify-center">
-        <div className="flex items-center gap-3 text-deep-blue/40">
-          <div className="w-4 h-4 border-2 border-deep-blue/15 border-t-deep-blue/50 rounded-full animate-spin" />
+        {/* role="status" + aria-live so a screen reader announces the loading
+            state on this public proof surface — the cold-visitor entry point
+            the embed flywheel targets, where the always-on accessibility
+            investment matters most. The spinner is decorative, so hide it. */}
+        <div className="flex items-center gap-3 text-deep-blue/40" role="status" aria-live="polite">
+          <div className="w-4 h-4 border-2 border-deep-blue/15 border-t-deep-blue/50 rounded-full animate-spin" aria-hidden="true" />
           <span className="text-sm">Loading verification...</span>
         </div>
       </div>

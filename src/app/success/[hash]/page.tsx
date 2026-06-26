@@ -184,6 +184,12 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
               readOnly
               value={verifyUrl}
               aria-label="Verification link"
+              // Select the whole link on focus/click so the field is a working
+              // manual-copy fallback. `copyToClipboard()` silently no-ops when
+              // `writeClipboard()` fails (insecure context, denied permission —
+              // the cases the clipboard trust-boundary helper guards), and this
+              // read-only input is the only other path to the proof link.
+              onFocus={(e) => e.currentTarget.select()}
               className="flex-1 px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-sm font-mono text-cream/80 focus:outline-none"
             />
             <button
