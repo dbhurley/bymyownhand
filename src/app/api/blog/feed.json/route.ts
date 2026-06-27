@@ -54,6 +54,13 @@ export async function GET() {
     // revalidate keeps it cheap and fresh. The JSON Feed is a discovery surface
     // we deliberately keep crawlable and a Phase 4.1 (opt-in feed) surface.
     headers: {
+      // JSON Feed 1.1 specifies `application/feed+json` as the feed's media
+      // type; `NextResponse.json` defaults to `application/json`. Feed readers
+      // and `<link rel="alternate">` auto-discovery that content-type-sniff
+      // rely on the registered type to recognize this as a subscribable feed
+      // rather than a generic JSON document. Feed-correctness sibling of the
+      // §6.33 `home_page_url` and §6.12 `date_published` fixes.
+      'Content-Type': 'application/feed+json; charset=utf-8',
       'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400',
     },
   });
