@@ -289,17 +289,45 @@ export function getCategories(): BlogCategory[] {
 
 export function getAllTags(): TagCount[] {
   const posts = getAllPosts();
-  const tagMap = new Map<string, number>();
+
+  // Aggregate tags case-insensitively. The corpus tags the same topic with
+  // mixed casing across posts ("Compliance"/"compliance", "AI Transparency"/
+  // "AI transparency", "Authenticity Verification"/"authenticity verification"),
+  // and the old map keyed on the raw string — so each variant became its own
+  // "Popular Topics" chip with a split count, double-listing the topic and
+  // potentially pushing a genuinely-popular tag out of the top 15. The category
+  // classifier (getCategories) and the related-posts scorer already lowercase
+  // before matching; this brings the tag cloud — the third blog-discovery
+  // surface — onto the same case-insensitive footing (the §6.27/§6.28/§6.34
+  // tag-precision lineage). Each bucket keeps the most-frequent original casing
+  // for display (first-seen wins ties), so a chip still reads naturally.
+  const buckets = new Map<string, { count: number; displays: Map<string, number> }>();
 
   for (const post of posts) {
     for (const tag of post.tags) {
-      if (isVisibleTag(tag)) {
-        tagMap.set(tag, (tagMap.get(tag) || 0) + 1);
+      if (!isVisibleTag(tag)) continue;
+      const key = tag.toLowerCase();
+      let bucket = buckets.get(key);
+      if (!bucket) {
+        bucket = { count: 0, displays: new Map() };
+        buckets.set(key, bucket);
       }
+      bucket.count += 1;
+      bucket.displays.set(tag, (bucket.displays.get(tag) || 0) + 1);
     }
   }
 
-  return Array.from(tagMap.entries())
-    .map(([tag, count]) => ({ tag, count }))
-    .sort((a, b) => b.count - a.count);
+  return Array.from(buckets.values())
+    .map(({ count, displays }) => {
+      let tag = '';
+      let best = -1;
+      for (const [display, n] of displays) {
+        if (n > best) {
+          best = n;
+          tag = display;
+        }
+      }
+      return { tag, count };
+    })
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
 }

@@ -136,13 +136,34 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
         return;
       }
 
-      // Check if it's a deletion
+      // Check if it's a deletion. Checked before the command-combo guard below
+      // so a Cmd/Ctrl+Backspace (delete-word/delete-to-line-start) still counts
+      // as the deletion it is.
       if (e.code === 'Backspace' || e.code === 'Delete') {
         recordEvent({
           type: 'delete',
           key: e.code,
           pos,
         });
+        return;
+      }
+
+      // Skip command-shortcut keyups. The onKeyDown handler already processes
+      // Cmd/Ctrl+V (paste), +C (copy), and +X (cut), but it can't suppress the
+      // *keyup* for those combos — and any other shortcut (Cmd/Ctrl+A select-all,
+      // +Z undo, +S save) fires a keyup too. With no modifier guard here, each of
+      // those landed in the trace as a phantom `key` event: a blocked paste
+      // recorded both `paste_blocked` *and* a `KeyV` keystroke, an internal paste
+      // both `paste_internal` *and* a `KeyV`, and a copy/undo/select-all a bare
+      // `KeyC`/`KeyZ`/`KeyA` — none of which typed a character. Those phantoms
+      // inflate `longestBurst`, distort `avgKeystrokeInterval`/variance, and nudge
+      // playback's cursor past the real content. Skip meta combos (Cmd on macOS,
+      // never used for text entry) and ctrl-without-alt combos (a shortcut),
+      // while still recording Ctrl+Alt (AltGr) keyups so European-layout
+      // characters like € / @ remain captured. Inverse of the §6.20
+      // keystroke-coverage fix: that added missing real keys; this drops phantom
+      // command-combo keys.
+      if (e.metaKey || (e.ctrlKey && !e.altKey)) {
         return;
       }
 
