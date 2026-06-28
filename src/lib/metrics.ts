@@ -6,10 +6,16 @@ import type { KeystrokeEvent, WritingMetrics } from './types';
 // is the contract; consolidating it here keeps the 10-word threshold and the
 // `averageWordLength` denominator in lockstep.
 export function countWords(content: string): number {
-  if (!content) return 0;
-  const trimmed = content.trim();
-  if (!trimmed) return 0;
-  return trimmed.split(/\s+/).filter(Boolean).length;
+  // Defer to splitWords() so the trim + collapse-whitespace + drop-empty-tokens
+  // rule lives in exactly one place. Both functions previously inlined the same
+  // `trim().split(/\s+/).filter(Boolean)` contract, so a future change to the
+  // splitting rule (e.g. a different whitespace class, or treating em-dashes as
+  // separators) had two copies to keep in lockstep — and countWords is the
+  // 10-word certification gate while splitWords feeds the averageWordLength
+  // denominator, so a drift between them would desync the two. Same cost (both
+  // allocate the token array) and same drift-prevention shape as the prior
+  // getScoreLabel / computeWpm / getSessionWritingTime consolidations.
+  return splitWords(content).length;
 }
 
 export function splitWords(content: string): string[] {

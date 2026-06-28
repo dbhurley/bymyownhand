@@ -88,6 +88,17 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
+        {/* JSON Feed auto-discovery. The §6.37 fix set the spec-correct
+            `application/feed+json` media type on the feed route *so that*
+            content-type-sniffing feed readers recognize it as subscribable —
+            but a reader can only sniff a feed it can find, and there was no
+            `<link rel="alternate">` advertising it anywhere in the document
+            head. Declaring it here (raw in <head> rather than via Metadata's
+            `alternates.types`, so it survives on the blog routes that override
+            `alternates` for their per-page canonical URLs, §6.35) completes the
+            autodiscovery path: a reader's "subscribe" on any page now finds the
+            blog feed. Discovery-surface sibling of the §6.37 media-type fix. */}
+        <link rel="alternate" type="application/feed+json" title="By My Own Hand Blog" href="/api/blog/feed.json" />
       </head>
       <body
         className={`${bricolage.variable} ${geistMono.variable} antialiased`}

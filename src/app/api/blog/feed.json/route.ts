@@ -40,6 +40,15 @@ export async function GET() {
     home_page_url: `${siteUrl}/blog`,
     feed_url: `${siteUrl}/api/blog/feed.json`,
     description: 'Insights on human authenticity, writing verification, and identity in the age of AI.',
+    // JSON Feed 1.1 optional top-level branding: `icon` is the large square
+    // image a reader shows next to the feed (the spec suggests 512×512+), and
+    // `favicon` the small one (~64px) for compact lists. Both must be absolute
+    // URLs. We already ship these raster assets (used by the OG/Twitter cards
+    // and the PWA manifest), so advertising them lets a subscribing reader
+    // render the feed with our mark instead of a generic placeholder — a small
+    // branding win on the discovery surface §6.37 made auto-discoverable.
+    icon: `${siteUrl}/icon-512x512.png`,
+    favicon: `${siteUrl}/icon-192x192.png`,
     language: 'en-US',
     items,
   };
