@@ -58,7 +58,7 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
             </div>
           </div>
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8 border-t border-deep-blue/10 text-sm text-deep-blue/40">
-            <span>&copy; 2025 By My Own Hand</span>
+            <span>&copy; {new Date().getFullYear()} By My Own Hand</span>
             <p className="italic">Prove you&apos;re human, one keystroke at a time.</p>
           </div>
         </div>
