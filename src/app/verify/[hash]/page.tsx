@@ -351,10 +351,23 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
             <span className="text-xs font-semibold text-deep-blue/35 uppercase tracking-wider">Writing Playback</span>
             <div className="flex items-center gap-3">
               {playbackProgress > 0 && playbackProgress < 100 && (
-                <span className="text-xs text-deep-blue/35 tabular-nums font-mono">{playbackProgress}%</span>
+                <span
+                  className="text-xs text-deep-blue/35 tabular-nums font-mono"
+                  role="progressbar"
+                  aria-label="Writing playback progress"
+                  aria-valuenow={playbackProgress}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  {playbackProgress}%
+                </span>
               )}
+              {/* Dynamic aria-label gives the icon-light control context for a
+                  screen reader while keeping the visible word ("Play"/"Stop")
+                  inside the accessible name (WCAG 2.5.3, Label in Name). */}
               <button
                 onClick={isPlaying ? stopPlayback : startPlayback}
+                aria-label={isPlaying ? 'Stop writing playback' : 'Play writing playback'}
                 className="px-4 py-1.5 bg-deep-blue text-cream text-xs font-medium rounded-full hover:bg-deep-blue/90 transition-colors"
               >
                 {isPlaying ? 'Stop' : 'Play'}
