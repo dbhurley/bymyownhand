@@ -25,10 +25,12 @@ export function DownloadCertificate({
   integrityScore,
 }: DownloadCertificateProps) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleDownload = async () => {
     setIsGenerating(true);
-    
+    setError(null);
+
     try {
       // Generate QR code
       const verifyUrl = getCanonicalVerifyUrl(verificationHash);
@@ -72,29 +74,40 @@ export function DownloadCertificate({
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Failed to generate certificate. Please try again.');
+      // Surface the failure inline rather than via a blocking `alert()` modal —
+      // a native alert is jarring and breaks the "calm, premium" brand pillar,
+      // and (unlike the inline error pattern already used on /write) steals
+      // focus and can't be styled. The retry path is the same button below.
+      setError('Could not generate the certificate. Please try again.');
     } finally {
       setIsGenerating(false);
     }
   };
 
   return (
-    <button
-      onClick={handleDownload}
-      disabled={isGenerating}
-      className="flex items-center justify-center gap-2 px-6 py-3 bg-accent text-white rounded-lg font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
-    >
-      {isGenerating ? (
-        <>
-          <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          Generating...
-        </>
-      ) : (
-        <>
-          <span>📄</span>
-          Download Certificate
-        </>
+    <div className="flex flex-col items-center gap-2">
+      <button
+        onClick={handleDownload}
+        disabled={isGenerating}
+        className="flex items-center justify-center gap-2 px-6 py-3 bg-accent text-white rounded-lg font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
+      >
+        {isGenerating ? (
+          <>
+            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            Generating...
+          </>
+        ) : (
+          <>
+            <span>📄</span>
+            Download Certificate
+          </>
+        )}
+      </button>
+      {error && (
+        <p role="alert" className="text-xs text-red-600 text-center">
+          {error}
+        </p>
       )}
-    </button>
+    </div>
   );
 }

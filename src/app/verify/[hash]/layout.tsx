@@ -1,0 +1,78 @@
+import type { Metadata } from 'next';
+import { getDocumentByHash } from '@/lib/db';
+import { isValidVerificationHash } from '@/lib/hash';
+
+// Server layout wrapping the (client) /verify/<hash> proof page so it can carry
+// per-request metadata the page itself can't: the page is `'use client'` (it
+// reads sessionStorage for the author's own just-certified fast-path and falls
+// back to the API), so it can't export `generateMetadata`. This layout runs for
+// the crawler / social scraper that fetches a *shared* proof link. Two fixes:
+//
+//  1. Self-referential canonical. The root layout declares
+//     `alternates: { canonical: "/" }`, and Next.js inherits a parent's
+//     `alternates` into any child route that doesn't override it — so every
+//     /verify/<hash> was emitting `<link rel="canonical" href=".../">`, telling
+//     search engines the proof page (the crawlable surface the embed flywheel
+//     drives cold visitors to — `/verify` is intentionally *not* disallowed in
+//     robots.ts, unlike `/success`) is a duplicate of the homepage. Same
+//     inherited-canonical bug the §6.35 blog-canonical fix corrected; point it
+//     at the page's own URL.
+//
+//  2. Per-document share card. When a writer shares their proof link on
+//     X / LinkedIn / iMessage, the scraper saw only the generic root title
+//     ("By My Own Hand | Prove Your Writing is Human"). Sharing is a core
+//     success metric and the embed flywheel depends on shared proof links
+//     looking credible, so surface the document's own title in the OG/Twitter
+//     card when we can resolve it (DB-backed). Falls back to the generic card
+//     when there's no DATABASE_URL or the hash isn't found — identical to
+//     today's behavior, so no regression on the MVP no-DB path. The bespoke OG
+//     *image* with title + score + word count (Phase 1.5 ◐) remains separate
+//     future work; this gets the per-document *title* into the card today.
+export async function generateMetadata({ params }: { params: Promise<{ hash: string }> }): Promise<Metadata> {
+  const { hash } = await params;
+  const valid = isValidVerificationHash(hash);
+  const canonicalPath = valid ? `/verify/${hash}` : '/verify';
+
+  let docTitle: string | null = null;
+  if (valid) {
+    try {
+      const doc = await getDocumentByHash(hash);
+      if (doc && typeof doc.title === 'string' && doc.title.trim()) {
+        docTitle = doc.title.trim();
+      }
+    } catch {
+      // No DB / lookup failure — fall through to the generic share card.
+    }
+  }
+
+  // No resolvable document (the common MVP no-DB path, or an unknown hash):
+  // still fix the canonical, but inherit the root OG/Twitter card unchanged.
+  if (!docTitle) {
+    return { alternates: { canonical: canonicalPath } };
+  }
+
+  const pageTitle = `"${docTitle}" — verified human-written`;
+  const description = `Proof that "${docTitle}" was composed keystroke by keystroke, by a human hand.`;
+  return {
+    title: pageTitle,
+    description,
+    alternates: { canonical: canonicalPath },
+    openGraph: {
+      title: pageTitle,
+      description,
+      type: 'article',
+      url: canonicalPath,
+      images: [{ url: '/icon-512x512.png', width: 512, height: 512, alt: 'By My Own Hand' }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: pageTitle,
+      description,
+      images: ['/icon-512x512.png'],
+    },
+  };
+}
+
+export default function VerifyLayout({ children }: { children: React.ReactNode }) {
+  return children;
+}
