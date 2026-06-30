@@ -59,10 +59,14 @@ export function DownloadCertificate({
 
       // Download. Filename slug strips non-Latin characters (so titles in
       // Japanese, Cyrillic, Arabic, etc. would collapse to dashes only and
-      // produce identical filenames across certifications). Fall back to the
-      // verification hash whenever the slug collapses to nothing useful, so
-      // every certificate gets a distinct, openable filename.
-      const slug = title.replace(/[^a-z0-9]/gi, '-').replace(/^-+|-+$/g, '').toLowerCase();
+      // produce identical filenames across certifications). Collapse runs of
+      // separators into a single dash so a title like "Hello, World!" becomes
+      // "hello-world" rather than "hello--world" (any sequence of non-alphanumeric
+      // characters — comma+space, em-dash surrounded by spaces, "..." — otherwise
+      // emits one dash each). Fall back to the verification hash whenever the slug
+      // collapses to nothing useful, so every certificate gets a distinct,
+      // openable filename.
+      const slug = title.replace(/[^a-z0-9]/gi, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '').toLowerCase();
       const safeSlug = slug || verificationHash;
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
