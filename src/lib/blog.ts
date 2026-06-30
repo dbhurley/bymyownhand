@@ -162,7 +162,15 @@ export function getAllPosts(): BlogPost[] {
   if (!fs.existsSync(BLOG_DIR)) return [];
   const files = fs.readdirSync(BLOG_DIR).filter(f => f.endsWith('.md') && f !== 'README.md');
   const posts = files.map(parsePost).filter((p): p is BlogPost => p !== null);
-  posts.sort((a, b) => b.date.localeCompare(a.date));
+  // Newest-first, with a slug tiebreaker so posts that share a date have a
+  // stable, deterministic order. 14 of the corpus dates carry two posts, and
+  // `readdirSync` does not guarantee a sorted order — so without the tiebreaker
+  // the relative order of same-date posts could differ across machines and
+  // deployments, drifting the blog index, the sitemap entry order, and
+  // `getFeaturedPost()` (`posts[0]`) whenever the newest date is itself shared.
+  // The tiebreaker pins it to the slug. Determinism sibling of the sitemap
+  // freshness-honesty fixes — a stable surface for crawlers to re-fetch.
+  posts.sort((a, b) => b.date.localeCompare(a.date) || a.slug.localeCompare(b.slug));
   cachedPosts = posts;
   return posts;
 }

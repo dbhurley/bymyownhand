@@ -49,6 +49,15 @@ export async function GET() {
     // branding win on the discovery surface §6.37 made auto-discoverable.
     icon: `${siteUrl}/icon-512x512.png`,
     favicon: `${siteUrl}/icon-192x192.png`,
+    // JSON Feed 1.1 defines a top-level `authors` array describing the feed
+    // itself (distinct from each item's `authors`, which carry the per-post
+    // frontmatter author). A reader uses it to label the whole subscription; the
+    // feed previously declared per-item authors and `icon`/`favicon` branding but
+    // left the feed-level author blank, so the publication rendered nameless in
+    // the subscription list. Point it at the site name and URL. Feed-correctness
+    // sibling of the §6.39 `icon`/`favicon` branding and the §6.33 `home_page_url`
+    // fixes on the discovery surface §6.38 made auto-discoverable.
+    authors: [{ name: 'By My Own Hand', url: siteUrl }],
     language: 'en-US',
     items,
   };

@@ -48,7 +48,10 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
 
   const eventsRef = useRef<KeystrokeEvent[]>(initialDraft?.events ?? []);
   const internalClipboard = useRef<string>('');
-  const editorRef = useRef<any>(null);
+  // Type the editor ref from the OnMount callback's own first parameter rather
+  // than `any`, so the ref reflects the real Monaco editor instance type without
+  // pulling in a direct `monaco-editor` import.
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
 
   // Update elapsed time every second
   useEffect(() => {
@@ -68,7 +71,7 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
     eventsRef.current.push({ ...event, t });
   }, [startTime]);
 
-  const handleEditorMount: OnMount = (editor, monaco) => {
+  const handleEditorMount: OnMount = (editor) => {
     editorRef.current = editor;
 
     // Block external paste - intercept clipboard
