@@ -493,10 +493,17 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
             <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em]">
               Embed badge
             </p>
-            <div className="flex items-center gap-1 p-0.5 bg-deep-blue/[0.04] rounded-full" role="tablist" aria-label="Embed format">
+            {/* A format switcher, not a tab set: `role="tab"`/`tablist` promises
+                a tabpanel relationship (`aria-controls`), roving tabindex, and
+                arrow-key navigation that this control doesn't implement, so a
+                screen reader announced "tab, 1 of 2" and offered tab semantics
+                that went nowhere. `aria-pressed` toggle buttons describe what
+                these actually are — two mutually-exclusive on/off toggles that
+                swap the snippet below. Accessibility-honesty sibling of the
+                §6.39 playback-control and §6.29 verification-link a11y fixes. */}
+            <div className="flex items-center gap-1 p-0.5 bg-deep-blue/[0.04] rounded-full" role="group" aria-label="Embed format">
               <button
-                role="tab"
-                aria-selected={embedFormat === 'markdown'}
+                aria-pressed={embedFormat === 'markdown'}
                 onClick={() => setEmbedFormat('markdown')}
                 className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
                   embedFormat === 'markdown' ? 'bg-deep-blue text-cream' : 'text-deep-blue/50 hover:text-deep-blue'
@@ -505,8 +512,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
                 Markdown
               </button>
               <button
-                role="tab"
-                aria-selected={embedFormat === 'html'}
+                aria-pressed={embedFormat === 'html'}
                 onClick={() => setEmbedFormat('html')}
                 className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
                   embedFormat === 'html' ? 'bg-deep-blue text-cream' : 'text-deep-blue/50 hover:text-deep-blue'

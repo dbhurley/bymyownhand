@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getAllPosts, getFeaturedPost, getCategories, getAllTags, visibleTags } from '@/lib/blog';
 import { getSiteUrl } from '@/lib/site';
+import { organizationJsonLd, websiteJsonLd } from '@/lib/structuredData';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -147,22 +148,11 @@ export default function BlogPage() {
           to the / and /write JSON-LD. */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify({
-          '@context': 'https://schema.org',
-          '@type': 'Organization',
-          name: 'By My Own Hand',
-          url: siteUrl,
-          logo: `${siteUrl}/logo.svg`,
-        }) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify({
-          '@context': 'https://schema.org',
-          '@type': 'WebSite',
-          name: 'By My Own Hand Blog',
-          url: `${siteUrl}/blog`,
-        }) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd('By My Own Hand Blog', `${siteUrl}/blog`)) }}
       />
 
       {/* ── Main Content + Sidebar ── */}

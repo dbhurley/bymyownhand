@@ -7,7 +7,8 @@ import Link from 'next/link';
 import type { WritingSession } from '@/lib/types';
 import { clearDraft, formatDraftAge, loadDraft, type DraftSnapshot } from '@/lib/draft';
 import { countWords } from '@/lib/metrics';
-import { getSiteUrl } from '@/lib/site';
+import { getStreakSummary, type StreakSummary } from '@/lib/history';
+import { organizationJsonLd, websiteJsonLd } from '@/lib/structuredData';
 
 // Dynamic import for Monaco to avoid SSR issues
 const LockedEditor = dynamic(() => import('@/components/LockedEditor'), {
@@ -26,13 +27,12 @@ type DraftDecision = 'pending' | 'resume' | 'fresh';
 
 export default function WritePage() {
   const router = useRouter();
-  const siteUrl = getSiteUrl();
-  const logoUrl = `${siteUrl}/logo.svg`;
   const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftSnapshot | null>(null);
   const [decision, setDecision] = useState<DraftDecision>('pending');
+  const [streak, setStreak] = useState<StreakSummary | null>(null);
 
   useEffect(() => {
     const existing = loadDraft();
@@ -42,6 +42,13 @@ export default function WritePage() {
     } else {
       setDecision('fresh');
     }
+    // Surface the returning writer's habit before they start — the same
+    // local-first streak the /success page records into `lib/history.ts`
+    // (Phase 1.4). Seeing "3-day streak" as you sit down to write is the
+    // reinforcement half of the habit loop the success-page pill only rewards
+    // *after* the fact. Reads localStorage on mount, so it stays a client-only
+    // effect; shows nothing until a first piece is certified.
+    setStreak(getStreakSummary());
   }, []);
 
   const handleResume = () => setDecision('resume');
@@ -98,6 +105,18 @@ export default function WritePage() {
         </Link>
 
         <div className="flex items-center gap-4">
+          {/* Calm returning-writer streak — the reinforcement half of the
+              Phase 1.4 habit loop, shown before writing rather than only after.
+              Hidden while submitting/erroring so it never competes with those
+              transient states, and absent entirely until a first certification. */}
+          {!error && !isSubmitting && streak && streak.streak > 1 && (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white border border-deep-blue/[0.08] rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-deep-blue/40" />
+              <span className="text-xs text-deep-blue/60">
+                <span className="font-semibold text-deep-blue">{streak.streak}</span>-day streak
+              </span>
+            </div>
+          )}
           {error && (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-100 rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
@@ -126,22 +145,11 @@ export default function WritePage() {
           principle as the prior "no fabricated evidence" series. */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify({
-          '@context': 'https://schema.org',
-          '@type': 'Organization',
-          name: 'By My Own Hand',
-          url: siteUrl,
-          logo: logoUrl,
-        }) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify({
-          '@context': 'https://schema.org',
-          '@type': 'WebSite',
-          name: 'By My Own Hand',
-          url: siteUrl,
-        }) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd()) }}
       />
 
       {/* Editor */}
