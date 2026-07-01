@@ -275,6 +275,12 @@ export function Certificate({
           </View>
           {qrCodeDataUrl && (
             <View style={styles.qrSection}>
+              {/* This is @react-pdf/renderer's `Image`, which draws into the PDF
+                  and has no `alt` concept — the jsx-a11y/alt-text rule (written
+                  for DOM <img>) is a false positive here. The QR only encodes
+                  the verification URL, which is already printed as text in the
+                  footer beside it, so it carries no information a reader loses. */}
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
               <Image src={qrCodeDataUrl} style={{ width: 80, height: 80 }} />
             </View>
           )}

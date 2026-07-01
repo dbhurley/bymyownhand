@@ -1,9 +1,7 @@
 import Link from 'next/link';
-import { getSiteUrl } from '@/lib/site';
+import { organizationJsonLd, websiteJsonLd } from '@/lib/structuredData';
 
 export default function Home() {
-  const siteUrl = getSiteUrl();
-  const logoUrl = `${siteUrl}/logo.svg`;
   return (
     <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
       {/* Navigation */}
@@ -179,23 +177,12 @@ export default function Home() {
     
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify({
-          '@context': 'https://schema.org',
-          '@type': 'Organization',
-          name: 'By My Own Hand',
-          url: siteUrl,
-          logo: logoUrl,
-        }) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }}
       />
 
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify({
-          '@context': 'https://schema.org',
-          '@type': 'WebSite',
-          name: 'By My Own Hand',
-          url: siteUrl,
-        }) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd()) }}
       />
     </div>
   );
