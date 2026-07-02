@@ -117,15 +117,23 @@ export default function WritePage() {
               </span>
             </div>
           )}
+          {/* role="alert" so a screen reader announces a failed certification —
+              the header is the only place the submission error surfaces, and a
+              writer using assistive tech otherwise gets no feedback that the
+              Complete they just pressed failed. Same a11y-honesty lineage as the
+              DownloadCertificate inline error (role="alert") and the /verify
+              loading state (role="status"). */}
           {error && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-100 rounded-full">
+            <div role="alert" className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-100 rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
               <span className="text-xs text-red-600">{error}</span>
             </div>
           )}
+          {/* role="status" + aria-live so the in-flight certification is
+              announced too; the decorative spinner is hidden from the a11y tree. */}
           {isSubmitting && (
-            <div className="flex items-center gap-2">
-              <div className="w-3.5 h-3.5 border-2 border-deep-blue/20 border-t-deep-blue/60 rounded-full animate-spin" />
+            <div className="flex items-center gap-2" role="status" aria-live="polite">
+              <div className="w-3.5 h-3.5 border-2 border-deep-blue/20 border-t-deep-blue/60 rounded-full animate-spin" aria-hidden="true" />
               <span className="text-xs text-deep-blue/50">Certifying...</span>
             </div>
           )}

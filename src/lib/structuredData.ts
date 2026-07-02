@@ -18,6 +18,12 @@ export function organizationJsonLd() {
     name: 'By My Own Hand',
     url: siteUrl,
     logo: `${siteUrl}/logo.svg`,
+    // A short description so search engines have organization-level context for
+    // the knowledge panel instead of only a name and logo. Mirrors the site's
+    // meta description; lands in the shared helper so all three surfaces (`/`,
+    // `/write`, `/blog`) advertise it consistently.
+    description:
+      'By My Own Hand certifies that a piece of writing was composed by a human, keystroke by keystroke — a lockdown editor captures every keystroke, blocks external paste, and produces a shareable proof of authorship.',
   };
 }
 
