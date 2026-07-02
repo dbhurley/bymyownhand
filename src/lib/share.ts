@@ -10,7 +10,13 @@
 // consolidations.
 
 export function buildTweetUrl(text: string): string {
-  return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+  // Target the canonical `x.com` intent host, not `twitter.com`. Since X's
+  // domain migration `twitter.com/intent/tweet` 301-redirects to `x.com`, so
+  // every share paid a redirect hop — and some in-app browsers and link-preview
+  // scrapers drop or mangle the long `text` query param across the cross-domain
+  // redirect. Pointing straight at `x.com` removes the hop and matches the
+  // "Post on X" label both share surfaces already use.
+  return `https://x.com/intent/tweet?text=${encodeURIComponent(text)}`;
 }
 
 export function buildLinkedInShareUrl(verifyUrl: string): string {

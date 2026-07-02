@@ -168,8 +168,14 @@ export default function Home() {
               <img src="/logo.svg" alt="" width="16" height="14" className="block opacity-25" />
               <span>&copy; {new Date().getFullYear()} By My Own Hand</span>
             </div>
-            <span className="hidden md:inline text-deep-blue/15">|</span>
-            <Link href="/blog" className="hover:text-deep-blue/60 transition-colors hidden md:inline">Blog</Link>
+            {/* Keep the Blog link reachable on every breakpoint. The nav's Blog
+                link is `hidden sm:inline`, so on a phone (<640px) this footer was
+                the only remaining path to /blog — and it was `hidden md:inline`,
+                leaving mobile homepage visitors with no way to reach the blog at
+                all. The blog is the content-marketing surface the SEO work drives
+                traffic to, so make its link (and divider) visible everywhere. */}
+            <span className="text-deep-blue/15">|</span>
+            <Link href="/blog" className="hover:text-deep-blue/60 transition-colors">Blog</Link>
           </div>
           <p>Prove you&apos;re human, one keystroke at a time.</p>
         </div>
