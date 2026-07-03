@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState, use, useRef } from 'react';
+import { useEffect, useState, use, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import type { WritingMetrics, KeystrokeEvent } from '@/lib/types';
-import { calculateIntegrityScore, computeWpm, formatDuration, getScoreLabel, getSessionWritingTime } from '@/lib/metrics';
+import { calculateIntegrityScore, calculateMetrics, computeWpm, formatDuration, getScoreLabel, getSessionWritingTime } from '@/lib/metrics';
 import { isValidVerificationHash } from '@/lib/hash';
 import { buildVerifyUrl } from '@/lib/site';
 import { buildEmbedSnippets } from '@/lib/embed';
@@ -186,6 +186,27 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
     };
   }, []);
 
+  // Derive the writing metrics from the canonical keystroke trace at read time
+  // rather than trusting the `metrics` blob the client packaged into the
+  // session. The PRD's stated principle is that the trace is the canonical
+  // record and the score is derived from it at read time — but the page was
+  // reading the stored `keystrokeData.metrics` directly, so a document POSTed
+  // straight to /api/documents with an honest-looking trace but a hand-crafted
+  // `metrics` object (inflated variance, fabricated pauses) would render those
+  // numbers *and* drive the integrity score, even though the events tell a
+  // different story. Recomputing from the events closes that gap on the public
+  // proof surface. For every document minted through the editor the value is
+  // identical (the editor computes it with this same function), so this is pure
+  // hardening with no visible change on the legitimate path. Memoized on
+  // `document` so it runs once per load, not on every playback frame — playback
+  // re-renders this component every ~10–200ms and the trace can be up to the
+  // 250k-event server cap.
+  const metrics = useMemo(() => {
+    const evs = document?.keystrokeData?.events;
+    if (!Array.isArray(evs) || evs.length === 0) return undefined;
+    return calculateMetrics(evs, document!.content);
+  }, [document]);
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-cream flex items-center justify-center">
@@ -231,7 +252,8 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
     );
   }
 
-  const metrics = document.keystrokeData?.metrics;
+  // `metrics` is derived above from the canonical trace (memoized on the
+  // document); it is defined iff the document carries a replayable trace.
   // Whether this document carries a replayable keystroke trace. A trace-less
   // document (a legacy record, or one whose `keystroke_data` is null) has no
   // events to play and no evidence behind the "How we verified this" claims —
