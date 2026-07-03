@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid';
 import { generateVerificationHash } from '@/lib/hash';
 import { createDocument } from '@/lib/db';
 import { getCanonicalVerifyUrl } from '@/lib/site';
-import { countWords } from '@/lib/metrics';
+import { countWords, calculateMetrics } from '@/lib/metrics';
 import type { WritingSession } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
@@ -123,7 +123,17 @@ export async function POST(request: NextRequest) {
       verificationHash,
       keystrokeData: {
         events: session.events,
-        metrics: session.metrics,
+        // Recompute the metrics summary server-side from the trace rather than
+        // persisting the client-supplied `session.metrics` blob. The trace is
+        // the canonical record — the verify page derives the score from it at
+        // read time, and a Phase 2.1 API consumer reading `keystroke_data`
+        // should get a summary that agrees with the events by construction. A
+        // direct API caller could otherwise POST an honest-looking trace next
+        // to a hand-crafted `metrics` object. Same trust-boundary shape as the
+        // server-recomputed `wordCount` (§6.15): the server is canonical for
+        // what it stores. Identical to the client value for any document minted
+        // through the editor, which computes it with this same function.
+        metrics: calculateMetrics(session.events, session.content),
       },
     };
 

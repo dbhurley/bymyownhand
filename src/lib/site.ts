@@ -6,7 +6,13 @@ const FALLBACK_SITE_URL = 'https://bymyownhand.com';
 
 export function getSiteUrl(): string {
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (fromEnv) return fromEnv.replace(/\/$/, '');
+  // Collapse *all* trailing slashes, not just one. Every consumer concatenates
+  // `${getSiteUrl()}/verify/...`, `/blog`, `/logo.svg`, etc., so a value like
+  // `https://foo.com//` (an easy env-var typo) would otherwise leave a trailing
+  // slash and emit double-slashed canonical tags, proof links, feed URLs, and
+  // embed-badge logos — each a small correctness/SEO blemish across the very
+  // surfaces this single source of truth exists to keep honest.
+  if (fromEnv) return fromEnv.replace(/\/+$/, '');
   return FALLBACK_SITE_URL;
 }
 
