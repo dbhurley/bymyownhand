@@ -17,7 +17,16 @@ export function organizationJsonLd() {
     '@type': 'Organization',
     name: 'By My Own Hand',
     url: siteUrl,
-    logo: `${siteUrl}/logo.svg`,
+    // Raster logo, not `/logo.svg`. Google's structured-data image guidelines
+    // accept raster formats (.jpg/.png/.gif/.webp) but not SVG — the same reason
+    // the §6.35 fix moved the `BlogPosting` publisher.logo to the raster
+    // `/icon-512x512.png`. This Organization `logo` (the more prominent
+    // knowledge-panel field, emitted on `/`, `/write`, and `/blog`) was the last
+    // logo still pointing at the SVG, so Google would drop it. Use the same
+    // raster asset the OG/Twitter cards and the BlogPosting publisher logo
+    // already ship, so every logo the site advertises to Google is eligible and
+    // consistent.
+    logo: `${siteUrl}/icon-512x512.png`,
     // A short description so search engines have organization-level context for
     // the knowledge panel instead of only a name and logo. Mirrors the site's
     // meta description; lands in the shared helper so all three surfaces (`/`,
