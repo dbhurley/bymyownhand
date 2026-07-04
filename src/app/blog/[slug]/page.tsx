@@ -1,5 +1,6 @@
 import { getAllPosts, getPostBySlug, getRelatedPosts, visibleTags } from '@/lib/blog';
 import { getSiteUrl } from '@/lib/site';
+import { SHARE_IMAGE_PATH, ogShareImages } from '@/lib/share';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
@@ -47,7 +48,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       // the one surface left image-less after the root default-image fix. Keep
       // the same default image so blog-post shares render a card like the rest
       // of the site.
-      images: [{ url: '/icon-512x512.png', width: 512, height: 512, alt: post.title }],
+      images: ogShareImages(post.title),
     },
     // Per-post Twitter card. The root layout sets a generic `twitter` block
     // (title "By My Own Hand", site description), and — like `alternates` —
@@ -60,7 +61,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       card: 'summary_large_image',
       title: post.title,
       description: post.excerpt,
-      images: ['/icon-512x512.png'],
+      images: [SHARE_IMAGE_PATH],
     },
   };
 }

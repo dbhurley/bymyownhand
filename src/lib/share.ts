@@ -22,3 +22,20 @@ export function buildTweetUrl(text: string): string {
 export function buildLinkedInShareUrl(verifyUrl: string): string {
   return `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(verifyUrl)}`;
 }
+
+// Single source of truth for the site-wide default Open Graph / Twitter share
+// image — the raster asset the site falls back to when a surface has no bespoke
+// card image. The path + intrinsic dimensions were inlined verbatim across four
+// metadata surfaces (`app/layout.tsx`, `app/blog/page.tsx`,
+// `app/blog/[slug]/page.tsx`, and `app/verify/[hash]/layout.tsx`), so the
+// Phase 1.5 bespoke per-document OG image — or any future asset swap / dimension
+// change — had four places to drift from. `ogShareImages(alt)` returns the
+// OpenGraph `images` array (which carries per-surface alt text and dimensions);
+// `SHARE_IMAGE_PATH` is the bare path the Twitter `images` array wants.
+// Drift-prevention sibling of the prior getSiteUrl / getScoreLabel /
+// buildEmbedSnippets / computeWpm consolidations.
+export const SHARE_IMAGE_PATH = '/icon-512x512.png';
+
+export function ogShareImages(alt: string) {
+  return [{ url: SHARE_IMAGE_PATH, width: 512, height: 512, alt }];
+}

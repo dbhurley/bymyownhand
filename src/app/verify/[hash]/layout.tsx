@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getDocumentByHash } from '@/lib/db';
 import { isValidVerificationHash } from '@/lib/hash';
+import { SHARE_IMAGE_PATH, ogShareImages } from '@/lib/share';
 
 // Server layout wrapping the (client) /verify/<hash> proof page so it can carry
 // per-request metadata the page itself can't: the page is `'use client'` (it
@@ -62,13 +63,13 @@ export async function generateMetadata({ params }: { params: Promise<{ hash: str
       description,
       type: 'article',
       url: canonicalPath,
-      images: [{ url: '/icon-512x512.png', width: 512, height: 512, alt: 'By My Own Hand' }],
+      images: ogShareImages('By My Own Hand'),
     },
     twitter: {
       card: 'summary_large_image',
       title: pageTitle,
       description,
-      images: ['/icon-512x512.png'],
+      images: [SHARE_IMAGE_PATH],
     },
   };
 }

@@ -318,6 +318,14 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
             placeholder="Untitled Document"
+            // A `placeholder` is not a reliable accessible name: it disappears
+            // once the field has a value and isn't consistently announced as a
+            // label. Without `aria-label` this is an unlabeled edit field — the
+            // WCAG 2.1 Level A failure the §6.29 fix closed for the /success
+            // verification-link input — and it's the first control a writer
+            // touches in the editor. Accessibility is an always-on cross-cutting
+            // roadmap investment.
+            aria-label="Document title"
             className="text-lg font-semibold bg-transparent border-none outline-none text-deep-blue placeholder-deep-blue/25 w-full md:w-72 focus:placeholder-deep-blue/40 transition-colors"
           />
           {isRecording && (

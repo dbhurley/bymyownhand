@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getAllPosts, getFeaturedPost, getCategories, getAllTags, visibleTags } from '@/lib/blog';
 import { getSiteUrl } from '@/lib/site';
 import { organizationJsonLd, websiteJsonLd } from '@/lib/structuredData';
+import { SHARE_IMAGE_PATH, ogShareImages } from '@/lib/share';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
     // route sets its own, so declaring `openGraph` here dropped the root's
     // default share image and left the blog-index card image-less — the same
     // §6.28 gap fixed for the per-post pages. Restore the default image.
-    images: [{ url: '/icon-512x512.png', width: 512, height: 512, alt: 'By My Own Hand Blog' }],
+    images: ogShareImages('By My Own Hand Blog'),
   },
   // Give the index its own Twitter card so X shows the blog title/description
   // (and an image) rather than the generic inherited site card.
@@ -29,7 +30,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Blog — Written by Hand, Read by All',
     description: 'Exploring authenticity, identity verification, and why human writing still matters in the age of AI.',
-    images: ['/icon-512x512.png'],
+    images: [SHARE_IMAGE_PATH],
   },
 };
 

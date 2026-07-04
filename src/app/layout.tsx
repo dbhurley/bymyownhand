@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { getSiteUrl } from "@/lib/site";
+import { SHARE_IMAGE_PATH, ogShareImages } from "@/lib/share";
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-bricolage",
@@ -55,13 +56,13 @@ export const metadata: Metadata = {
     // editor, and verification links degraded to a text-only preview — a miss
     // for sharing, which the PRD lists as a core success metric (each share is
     // a marketing event). Resolved relative to `metadataBase` above.
-    images: [{ url: "/icon-512x512.png", width: 512, height: 512, alt: "By My Own Hand" }],
+    images: ogShareImages("By My Own Hand"),
   },
   twitter: {
     card: "summary_large_image",
     title: "By My Own Hand",
     description: "Prove your writing is authentically human — keystroke by keystroke.",
-    images: ["/icon-512x512.png"],
+    images: [SHARE_IMAGE_PATH],
   },
   robots: {
     index: true,
