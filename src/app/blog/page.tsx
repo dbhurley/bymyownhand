@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getAllPosts, getFeaturedPost, getCategories, getAllTags, visibleTags } from '@/lib/blog';
+import { formatPostDate } from '@/lib/date';
 import { getSiteUrl } from '@/lib/site';
 import { organizationJsonLd, websiteJsonLd } from '@/lib/structuredData';
 import { SHARE_IMAGE_PATH, ogShareImages } from '@/lib/share';
@@ -111,7 +112,7 @@ export default function BlogPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-3">
                     <span className="blog-tag blog-tag-light">Latest</span>
-                    <span className="text-sm text-cream/40">{formatDate(featured.date)}</span>
+                    <time dateTime={featured.date} className="text-sm text-cream/40">{formatPostDate(featured.date, 'short')}</time>
                     <span className="text-sm text-cream/40">{featured.readTime}</span>
                   </div>
                   <h2 className="text-2xl md:text-3xl font-bold text-cream mb-3 group-hover:text-accent transition-colors leading-tight">
@@ -181,7 +182,13 @@ export default function BlogPage() {
                         {visibleTags(post.tags).slice(0, 2).map(tag => (
                           <span key={tag} className={`blog-tag blog-tag-${category.color}`}>{tag}</span>
                         ))}
-                        <span className="text-xs text-deep-blue/30">{post.date}</span>
+                        {/* Render the frontmatter date through the shared helper
+                            (matching the featured card and the post header) rather
+                            than the raw `YYYY-MM-DD` — a machine-looking value out
+                            of step with the formatted date shown elsewhere on the
+                            same page. Wrap in <time> for machine-readable semantics
+                            like the post header does. */}
+                        <time dateTime={post.date} className="text-xs text-deep-blue/30">{formatPostDate(post.date, 'short')}</time>
                       </div>
                       <h3 className="text-lg font-semibold text-deep-blue mb-2 group-hover:text-accent transition-colors leading-snug">
                         {post.title}
@@ -269,9 +276,4 @@ export default function BlogPage() {
       </section>
     </>
   );
-}
-
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00');
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
