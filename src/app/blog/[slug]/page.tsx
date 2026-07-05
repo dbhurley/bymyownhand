@@ -1,4 +1,5 @@
 import { getAllPosts, getPostBySlug, getRelatedPosts, visibleTags } from '@/lib/blog';
+import { formatPostDate } from '@/lib/date';
 import { getSiteUrl } from '@/lib/site';
 import { SHARE_IMAGE_PATH, ogShareImages } from '@/lib/share';
 import { notFound } from 'next/navigation';
@@ -149,7 +150,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
             <div>
               <p className="text-sm font-medium text-cream/80">{post.author || 'By My Own Hand'}</p>
               <div className="flex items-center gap-3 text-sm text-cream/40">
-                <time dateTime={post.date}>{formatDate(post.date)}</time>
+                <time dateTime={post.date}>{formatPostDate(post.date)}</time>
                 <span className="w-1 h-1 bg-cream/20 rounded-full" />
                 <span>{post.readTime}</span>
               </div>
@@ -211,7 +212,10 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
                     {visibleTags(rp.tags).slice(0, 2).map(tag => (
                       <span key={tag} className="blog-tag blog-tag-blue">{tag}</span>
                     ))}
-                    <span className="text-xs text-deep-blue/30">{rp.date}</span>
+                    {/* Formatted through the shared helper (like the post header
+                        above) rather than the raw `YYYY-MM-DD`, which read as a
+                        machine date next to the header's "July 5, 2026". */}
+                    <time dateTime={rp.date} className="text-xs text-deep-blue/30">{formatPostDate(rp.date, 'short')}</time>
                   </div>
                   <h3 className="font-semibold text-deep-blue group-hover:text-accent transition-colors leading-snug mb-2">
                     {rp.title}
@@ -231,9 +235,4 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
       )}
     </>
   );
-}
-
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00');
-  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
