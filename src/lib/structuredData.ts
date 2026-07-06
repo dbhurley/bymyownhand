@@ -33,6 +33,18 @@ export function organizationJsonLd() {
     // `/write`, `/blog`) advertise it consistently.
     description:
       'By My Own Hand certifies that a piece of writing was composed by a human, keystroke by keystroke — a lockdown editor captures every keystroke, blocks external paste, and produces a shareable proof of authorship.',
+    // Attribute the organization to its founder so Google can connect the
+    // knowledge-panel entity to the person behind it. Grounded in the site's
+    // own `public/llms.txt`, which names David Hurley (dbhurley.com) as the
+    // creator — not fabricated. The `url` doubles as a `sameAs`-style external
+    // reference. Additive, zero-risk enrichment lands in the shared helper, so
+    // all three surfaces (`/`, `/write`, `/blog`) advertise it consistently —
+    // discovery-enrichment sibling of the §6.42 Organization `description`.
+    founder: {
+      '@type': 'Person',
+      name: 'David Hurley',
+      url: 'https://dbhurley.com',
+    },
   };
 }
 
