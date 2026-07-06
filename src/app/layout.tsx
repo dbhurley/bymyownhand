@@ -89,6 +89,13 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
+        {/* Brand deep-blue (--deep-blue) for the mobile browser chrome / PWA
+            title bar, matching the `theme_color` in app/manifest.ts. Without
+            it the address-bar tints to a default, off-brand color on Android
+            Chrome and the installed-PWA title bar. The site is light-only
+            (cream surface), so a single theme-color is correct — no per-scheme
+            variants needed. */}
+        <meta name="theme-color" content="#1e3a5f" />
         {/* JSON Feed auto-discovery. The §6.37 fix set the spec-correct
             `application/feed+json` media type on the feed route *so that*
             content-type-sniffing feed readers recognize it as subscribable —
