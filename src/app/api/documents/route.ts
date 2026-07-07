@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid';
 import { generateVerificationHash } from '@/lib/hash';
 import { createDocument } from '@/lib/db';
 import { getCanonicalVerifyUrl } from '@/lib/site';
-import { countWords, calculateMetrics } from '@/lib/metrics';
+import { countWords, calculateMetrics, getSessionWritingTime } from '@/lib/metrics';
 import type { WritingSession } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
@@ -105,10 +105,17 @@ export async function POST(request: NextRequest) {
     // downstream surface that reads it (WPM, /verify Duration cell, the
     // certificate PDF). Trust-boundary fix paralleling the prior server-side
     // wordCount (§6.15) and title (§6.19) sanitization.
-    const startedAt = Number(session.startedAt);
-    const endedAt = Number(session.endedAt) || Date.now();
-    const rawWindow = endedAt - startedAt;
-    const writingTimeMs = Number.isFinite(rawWindow) && rawWindow > 0 ? rawWindow : 0;
+    //
+    // Derive it through the shared `getSessionWritingTime()` helper rather than
+    // re-implementing the `(endedAt || now) - startedAt` clamp inline — the same
+    // helper `/success` and `/verify` already use, so the certified window here
+    // and the rendered window there can't drift. The helper is also strictly
+    // more defensive than the previous inline math: it rejects a non-positive
+    // `startedAt` (a caller sending `startedAt: 0` or a negative epoch, which the
+    // inline `endedAt - 0` would have persisted as a ~54,000-year window) by
+    // returning 0. Drift-prevention sibling of the prior `computeWpm` /
+    // `getScoreLabel` / `countWords` consolidations, on the write boundary.
+    const writingTimeMs = getSessionWritingTime(session);
 
     // For MVP without database, store in memory or return hash directly.
     // In production, this saves to Neon. Note: integrity score isn't a
