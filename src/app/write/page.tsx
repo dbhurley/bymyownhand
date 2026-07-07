@@ -110,7 +110,7 @@ export default function WritePage() {
               Hidden while submitting/erroring so it never competes with those
               transient states, and absent entirely until a first certification. */}
           {!error && !isSubmitting && streak && streak.streak > 1 && (
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white border border-deep-blue/[0.08] rounded-full">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-deep-blue/[0.08] rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-deep-blue/40" />
               <span className="text-xs text-deep-blue/60">
                 <span className="font-semibold text-deep-blue">{streak.streak}</span>-day streak
