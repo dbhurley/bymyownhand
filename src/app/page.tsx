@@ -65,9 +65,14 @@ export default function Home() {
 
       {/* How It Works */}
       <section id="how-it-works" className="scroll-mt-20 max-w-3xl mx-auto px-6 py-20 md:py-24">
-        <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-16 text-center">
+        {/* An <h2>, not a styled <p>: the step titles below are <h3>, so leaving
+            these section labels as paragraphs made the page jump straight from
+            the hero <h1> to <h3> with no <h2> — a broken heading outline that
+            hurts screen-reader section navigation (WCAG 1.3.1) and the SEO
+            document outline. The visual styling is unchanged (same classes). */}
+        <h2 className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-16 text-center">
           How it works
-        </p>
+        </h2>
 
         <div className="space-y-14 md:space-y-16">
           {[
@@ -114,9 +119,12 @@ export default function Home() {
 
       {/* What We Analyze */}
       <section className="max-w-3xl mx-auto px-6 py-20 md:py-24">
-        <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-14 text-center">
+        {/* <h2> for the same heading-outline reason as the "How it works"
+            section above — keeps the page's h1 → h2 → h3 hierarchy valid.
+            Styling unchanged. */}
+        <h2 className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-14 text-center">
           What we analyze
-        </p>
+        </h2>
 
         <div className="space-y-6">
           {[

@@ -10,6 +10,7 @@ import { buildEmbedSnippets } from '@/lib/embed';
 import { buildLinkedInShareUrl, buildTweetUrl } from '@/lib/share';
 import { writeClipboard } from '@/lib/clipboard';
 import { WritingAnalysis } from '@/components/WritingAnalysis';
+import { XIcon, LinkedInIcon } from '@/components/ShareIcons';
 
 interface DocumentData {
   id: string;
@@ -493,9 +494,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
               rel="noopener noreferrer"
               className="flex-1 flex items-center justify-center gap-2 px-5 py-3 border border-deep-blue/15 text-deep-blue rounded-full font-medium text-sm hover:bg-deep-blue/5 transition-colors"
             >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                <path d="M12.6 1.5h2.3L9.7 7.4l5.9 7.1h-4.6L7.5 9.7l-4 4.8H1.2L7 7.7 1.2 1.5h4.7L9 5.7l3.6-4.2zM11.8 13.2h1.3L4.7 2.7H3.3l8.5 10.5z" />
-              </svg>
+              <XIcon />
               Post on X
             </a>
             <a
@@ -504,9 +503,7 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
               rel="noopener noreferrer"
               className="flex-1 flex items-center justify-center gap-2 px-5 py-3 border border-deep-blue/15 text-deep-blue rounded-full font-medium text-sm hover:bg-deep-blue/5 transition-colors"
             >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                <path d="M3.5 1.6a1.4 1.4 0 100 2.8 1.4 1.4 0 000-2.8zM2.2 5.4h2.6V14H2.2V5.4zM6.4 5.4h2.5v1.2h.04c.35-.66 1.21-1.36 2.49-1.36 2.66 0 3.15 1.75 3.15 4.03V14h-2.6V9.78c0-1.01-.02-2.31-1.41-2.31-1.41 0-1.62 1.1-1.62 2.24V14H6.4V5.4z" />
-              </svg>
+              <LinkedInIcon />
               LinkedIn
             </a>
           </div>
