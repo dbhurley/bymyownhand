@@ -59,5 +59,13 @@ export function websiteJsonLd(
     '@type': 'WebSite',
     name,
     url,
+    // Declare the site's primary language so search engines have an explicit
+    // language signal for the entity instead of inferring it from the page.
+    // Matches the document's own `<html lang="en">` / `openGraph.locale`
+    // (`en_US`) and the JSON Feed's `language` field. Additive, zero-risk
+    // enrichment that lands on all three surfaces (`/`, `/write`, `/blog`) in
+    // one edit — discovery-enrichment sibling of the Organization `founder` /
+    // `description` additions.
+    inLanguage: 'en-US',
   };
 }
