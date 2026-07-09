@@ -48,6 +48,37 @@ export function organizationJsonLd() {
   };
 }
 
+// BreadcrumbList for a blog post. The post page already renders a *visible*
+// breadcrumb ("Blog / <title>"), but with no matching structured data Google
+// can't render the breadcrumb rich result — the crawler sees a flat page with
+// no trail back to the section index. This mirrors the on-page trail exactly
+// (Blog → the post) so the machine-readable and human-readable breadcrumbs
+// agree. `item` is omitted on the last crumb per Google's guidance (the current
+// page shouldn't link to itself in the trail). Additive, zero-risk
+// discovery-enrichment sibling of the Organization `founder` / WebSite
+// `inLanguage` additions, applied to the 44+ post surface the sitemap already
+// ships to search engines.
+export function breadcrumbJsonLd(postTitle: string) {
+  const siteUrl = getSiteUrl();
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Blog',
+        item: `${siteUrl}/blog`,
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: postTitle,
+      },
+    ],
+  };
+}
+
 // The WebSite node the feed/index describes. `/` and `/write` use the root
 // defaults; `/blog` passes its own blog-scoped name and URL.
 export function websiteJsonLd(

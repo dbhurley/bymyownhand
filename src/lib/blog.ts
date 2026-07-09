@@ -12,6 +12,7 @@ export interface BlogPost {
   tags: string[];
   content: string;
   readTime: string;
+  wordCount: number;
   author?: string;
 }
 
@@ -143,6 +144,10 @@ function parsePost(filename: string): BlogPost | null {
       tags: Array.isArray(data['tags']) ? data['tags'].map(String) : [],
       content: html,
       readTime: `${Math.max(1, Math.ceil(wordCount / 250))} min read`,
+      // Kept (not just used for readTime) so the post page can advertise it as
+      // the BlogPosting `wordCount` structured-data property. Same body-derived
+      // count that drives readTime, so the two can't disagree.
+      wordCount,
       author: String(data['author'] || ''),
     };
   } catch {
