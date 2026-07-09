@@ -1,5 +1,6 @@
 import { getAllPosts, getPostBySlug, getRelatedPosts, visibleTags } from '@/lib/blog';
 import { formatPostDate } from '@/lib/date';
+import { breadcrumbJsonLd } from '@/lib/structuredData';
 import { getSiteUrl } from '@/lib/site';
 import { SHARE_IMAGE_PATH, ogShareImages } from '@/lib/share';
 import { notFound } from 'next/navigation';
@@ -43,7 +44,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       url: canonicalPath,
       publishedTime: post.date,
       authors: [authorName],
-      tags: post.tags,
+      // Emit only the visible topical tags as `article:tag`, not the project-
+      // meta boilerplate (`ByMyOwnHand`, `Next.js`) `visibleTags()` already
+      // hides from the chips and the related-posts scorer — the same
+      // tag-precision the BlogPosting `keywords` now applies, here on the OG
+      // surface a social scraper reads.
+      tags: visibleTags(post.tags),
       // Next.js replaces (does not deep-merge) the parent `openGraph` when a
       // route defines its own, so without this the per-post share card would be
       // the one surface left image-less after the root default-image fix. Keep
@@ -106,7 +112,21 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
     datePublished: post.date,
     dateModified: post.date,
     description: post.excerpt,
-    keywords: post.tags.join(', '),
+    // Advertise only the *visible* topical tags as keywords, not the raw set.
+    // `visibleTags()` hides the project-meta boilerplate ("ByMyOwnHand",
+    // "Next.js") from the tag chips and the related-posts scorer; the schema
+    // `keywords` field was the last surface still handing those noise tags to
+    // search engines as if they described the article's subject. Bring the
+    // machine-readable keywords onto the same footing as the human-visible
+    // chips — tag-precision sibling of the §6.27/§6.28/§6.34 lineage.
+    keywords: filteredTags.join(', '),
+    // Surface the article length as Google's recognized `wordCount` Article
+    // property. `parsePost()` already computes this from the post body (it
+    // drives `readTime`); it was simply discarded before. Additive
+    // structured-data enrichment on the same 44+ post surface the sitemap
+    // ships — sibling of the WebSite `inLanguage` / Organization `founder`
+    // additions.
+    wordCount: post.wordCount,
     mainEntityOfPage: { '@type': 'WebPage', '@id': postUrl },
     image: imageUrl,
     author,
@@ -123,11 +143,18 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      {/* BreadcrumbList mirroring the visible "Blog / <title>" trail below, so
+          the crawler can render the breadcrumb rich result and connect the post
+          back to its section index. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd(post.title)) }}
+      />
 
       {/* ── Post Header ── */}
       <header className="blog-hero px-6 md:px-12 pt-12 pb-16 md:pt-16 md:pb-20">
         <div className="max-w-3xl mx-auto">
-          <nav className="flex items-center gap-2 text-sm text-cream/40 mb-8 animate-fade-in-up">
+          <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-cream/40 mb-8 animate-fade-in-up">
             <Link href="/blog" className="hover:text-cream/70 transition-colors">Blog</Link>
             <span>/</span>
             <span className="text-cream/60 truncate max-w-[300px]">{post.title}</span>
