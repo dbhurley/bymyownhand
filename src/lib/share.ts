@@ -9,14 +9,24 @@
 // getScoreLabel / getSiteUrl / buildEmbedSnippets / buildVerifyUrl / countWords
 // consolidations.
 
-export function buildTweetUrl(text: string): string {
+export function buildTweetUrl(text: string, url?: string): string {
   // Target the canonical `x.com` intent host, not `twitter.com`. Since X's
   // domain migration `twitter.com/intent/tweet` 301-redirects to `x.com`, so
   // every share paid a redirect hop — and some in-app browsers and link-preview
   // scrapers drop or mangle the long `text` query param across the cross-domain
   // redirect. Pointing straight at `x.com` removes the hop and matches the
   // "Post on X" label both share surfaces already use.
-  return `https://x.com/intent/tweet?text=${encodeURIComponent(text)}`;
+  //
+  // Carry the proof link in X's dedicated `url` param rather than concatenated
+  // into `text`. X appends the `url` as a link and cards it from the page's
+  // OG/Twitter tags — which the per-document `/verify/<hash>` card now
+  // populates with the document title — so the shared tweet unfurls a proper
+  // preview instead of a bare inline link, and the composed message reads
+  // clean (the raw `bmoh-…` URL no longer clutters the sentence). Sharing is a
+  // core success metric, so this makes the artifact the flywheel puts in front
+  // of new readers look intentional. `text`-only callers are unaffected.
+  const base = `https://x.com/intent/tweet?text=${encodeURIComponent(text)}`;
+  return url ? `${base}&url=${encodeURIComponent(url)}` : base;
 }
 
 export function buildLinkedInShareUrl(verifyUrl: string): string {
