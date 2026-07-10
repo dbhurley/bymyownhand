@@ -405,8 +405,22 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
 
       {/* Footer */}
       <div className="flex-shrink-0 border-t border-deep-blue/[0.06]">
-        {/* Progress */}
-        <div className="h-0.5 bg-deep-blue/[0.04]">
+        {/* Progress toward the 10-word certification gate. Given
+            role="progressbar" semantics — the same a11y treatment the /verify
+            playback progressbar carries (§6.39) — so a screen-reader user
+            perceives how close they are to being able to certify, not just the
+            sighted writer watching the bar fill. `aria-valuenow` is capped at
+            the 10-word max so the value never overshoots; `aria-valuetext`
+            speaks the human phrasing the footer status shows. */}
+        <div
+          className="h-0.5 bg-deep-blue/[0.04]"
+          role="progressbar"
+          aria-label="Words toward the 10-word certification minimum"
+          aria-valuemin={0}
+          aria-valuemax={10}
+          aria-valuenow={Math.min(wordCount, 10)}
+          aria-valuetext={wordCount < 10 ? `${wordCount} of 10 words` : 'Ready to certify'}
+        >
           <div
             className="h-full bg-deep-blue/20 transition-all duration-500 ease-out"
             style={{ width: `${progressPercent}%` }}

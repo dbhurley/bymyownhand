@@ -276,8 +276,8 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   const wpm = Math.round(computeWpm(document.wordCount, document.writingTimeMs));
 
   const verifyUrl = buildVerifyUrl(hash);
-  const tweetText = `"${document.title}" was written by hand — every keystroke proven human. ${verifyUrl}`;
-  const tweetUrl = buildTweetUrl(tweetText);
+  const tweetText = `"${document.title}" was written by hand — every keystroke proven human.`;
+  const tweetUrl = buildTweetUrl(tweetText, verifyUrl);
   const linkedInUrl = buildLinkedInShareUrl(verifyUrl);
   const embeds = buildEmbedSnippets(verifyUrl);
   const embedSnippet = embedFormat === 'markdown' ? embeds.markdown : embeds.html;

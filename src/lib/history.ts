@@ -20,6 +20,7 @@ export interface CertificationRecord {
 export interface StreakSummary {
   total: number;
   streak: number; // consecutive days ending today (or yesterday, if user hasn't certified today)
+  best: number; // longest run of consecutive certifying days ever (personal best)
 }
 
 function readHistory(): CertificationRecord[] {
@@ -97,9 +98,10 @@ export function getStreakSummary(): StreakSummary {
 
 function summarize(history: CertificationRecord[]): StreakSummary {
   const total = history.length;
-  if (total === 0) return { total: 0, streak: 0 };
+  if (total === 0) return { total: 0, streak: 0, best: 0 };
 
   const days = new Set(history.map(r => dayKey(r.certifiedAt)));
+  const best = longestRun(history);
   const today = startOfDay(new Date());
   // Allow today OR yesterday as the anchor: someone who certified yesterday
   // but not yet today still has an active streak as of right now.
@@ -111,7 +113,7 @@ function summarize(history: CertificationRecord[]): StreakSummary {
   } else if (days.has(dayKey(yesterday.getTime()))) {
     cursor = yesterday;
   } else {
-    return { total, streak: 0 };
+    return { total, streak: 0, best };
   }
 
   let streak = 0;
@@ -119,7 +121,37 @@ function summarize(history: CertificationRecord[]): StreakSummary {
     streak++;
     cursor = addDays(cursor, -1);
   }
-  return { total, streak };
+  return { total, streak, best };
+}
+
+// Longest run of consecutive calendar days the writer ever certified on — the
+// personal best the /success pill recognizes ("longest streak yet"). The
+// current `streak` only counts the run ending today/yesterday, so a writer who
+// broke a long streak and started a new one had no memory of the record; the
+// habit loop is stronger when it can celebrate beating a personal best. Walk
+// the unique certifying days in chronological order and measure the longest
+// consecutive span, using addDays() for the same DST-safe day arithmetic the
+// active-streak scan relies on (a fixed 24h offset would miscount across a
+// 23h/25h DST boundary). Deduped to day granularity, so multiple pieces on one
+// day count once.
+function longestRun(history: CertificationRecord[]): number {
+  const dayStarts = Array.from(
+    new Set(history.map(r => startOfDay(new Date(r.certifiedAt)).getTime()))
+  ).sort((a, b) => a - b);
+
+  let best = 0;
+  let run = 0;
+  let prev: number | null = null;
+  for (const ts of dayStarts) {
+    if (prev !== null && dayKey(addDays(new Date(prev), 1).getTime()) === dayKey(ts)) {
+      run++;
+    } else {
+      run = 1;
+    }
+    prev = ts;
+    if (run > best) best = run;
+  }
+  return best;
 }
 
 function startOfDay(d: Date): Date {

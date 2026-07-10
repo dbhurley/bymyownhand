@@ -92,8 +92,8 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
   };
 
   const shareTitle = session?.title || 'My document';
-  const tweetText = `I wrote "${shareTitle}" by my own hand — every keystroke proven human. ${verifyUrl}`;
-  const tweetUrl = buildTweetUrl(tweetText);
+  const tweetText = `I wrote "${shareTitle}" by my own hand — every keystroke proven human.`;
+  const tweetUrl = buildTweetUrl(tweetText, verifyUrl);
   const linkedInUrl = buildLinkedInShareUrl(verifyUrl);
   const embeds = buildEmbedSnippets(verifyUrl);
   const embedSnippet = embedFormat === 'markdown' ? embeds.markdown : embeds.html;
@@ -142,6 +142,15 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
                   <span className="text-deep-blue/70">
                     <span className="font-semibold text-deep-blue">{streakSummary.streak}</span>-day streak
                   </span>
+                  {/* Recognize a personal best — when the active streak equals
+                      the longest run ever, the writer is at (or extending) their
+                      record. A calm "best yet" note reinforces the Phase 1.4
+                      habit loop by celebrating the milestone, not just the count. */}
+                  {streakSummary.streak === streakSummary.best && (
+                    <span className="text-[11px] font-medium text-success uppercase tracking-wider">
+                      Best yet
+                    </span>
+                  )}
                 </>
               )}
             </div>
