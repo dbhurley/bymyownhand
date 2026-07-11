@@ -74,7 +74,13 @@ export default function Home() {
           How it works
         </h2>
 
-        <div className="space-y-14 md:space-y-16">
+        {/* An ordered list: these are three sequential steps (01, 02, 03), so
+            <ol>/<li> gives a screen reader the count and order the numbered
+            visual already conveys to a sighted reader (WCAG 1.3.1). Tailwind's
+            preflight strips list markers/indentation, so the render is
+            unchanged. Same heading/structure-honesty spirit as the <h2> fix on
+            this page. */}
+        <ol className="space-y-14 md:space-y-16">
           {[
             {
               num: '01',
@@ -92,7 +98,7 @@ export default function Home() {
               desc: 'Get a shareable verification link and a downloadable certificate. Anyone can verify your writing is authentically human, anytime.',
             },
           ].map((step, i) => (
-            <div key={step.num} className="flex gap-6 md:gap-10 items-start">
+            <li key={step.num} className="flex gap-6 md:gap-10 items-start">
               <div className="flex flex-col items-center flex-shrink-0">
                 <span className="text-4xl md:text-5xl font-bold text-deep-blue/[0.07] leading-none tabular-nums select-none">
                   {step.num}
@@ -109,9 +115,9 @@ export default function Home() {
                   {step.desc}
                 </p>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ol>
       </section>
 
       {/* Ornamental divider */}
@@ -126,7 +132,13 @@ export default function Home() {
           What we analyze
         </h2>
 
-        <div className="space-y-6">
+        {/* A semantic <ul>: five parallel signals we analyze, marked up as a
+            list so a screen reader announces "list, 5 items" instead of five
+            unrelated paragraphs (WCAG 1.3.1). Tailwind's preflight removes the
+            default marker/indent, so the render is unchanged; the decorative
+            dot is hidden from the a11y tree since the <li> now carries the
+            list semantics. */}
+        <ul className="space-y-6">
           {[
             { label: 'Typing Speed', desc: 'Natural words-per-minute patterns that distinguish human rhythm from machine output' },
             { label: 'Paste Attempts', desc: 'Every external paste is blocked and logged \u2014 your words must originate in the editor' },
@@ -134,16 +146,16 @@ export default function Home() {
             { label: 'Edit Patterns', desc: 'Backspaces, rewrites, and revisions \u2014 the unmistakable trail of human deliberation' },
             { label: 'Keystroke Rhythm', desc: 'Timing variance between keystrokes that no algorithm can convincingly replicate' },
           ].map((item, i) => (
-            <div key={i} className="flex gap-4 items-baseline">
-              <span className="w-1.5 h-1.5 rounded-full bg-deep-blue/15 flex-shrink-0 mt-[0.6rem]" />
+            <li key={i} className="flex gap-4 items-baseline">
+              <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-deep-blue/15 flex-shrink-0 mt-[0.6rem]" />
               <div>
                 <span className="font-semibold text-deep-blue">{item.label}</span>
                 <span className="text-deep-blue/35 mx-2">&mdash;</span>
                 <span className="text-deep-blue/50">{item.desc}</span>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
 
       {/* Ornamental divider */}

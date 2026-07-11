@@ -1,4 +1,4 @@
-import { getAllPosts } from '@/lib/blog';
+import { getAllPosts, visibleTags } from '@/lib/blog';
 import { getSiteUrl } from '@/lib/site';
 import { NextResponse } from 'next/server';
 
@@ -21,7 +21,16 @@ export async function GET() {
       content_html: post.content,
       summary: post.excerpt,
       date_published: parsed.toISOString(),
-      tags: post.tags,
+      // Advertise only the *visible* topical tags, not the project-meta
+      // boilerplate ("ByMyOwnHand", "Next.js") that `visibleTags()` already
+      // hides from the tag chips, the related-posts scorer, the BlogPosting
+      // `keywords`, and the OG `article:tag` (§6.49). The JSON Feed `tags`
+      // array is another machine-readable tag surface a subscriber's reader
+      // shows and any Phase 4.1 ingesting partner consumes, so it should honor
+      // the same rule instead of telling them noise tags describe the post.
+      // Completes the §6.49 machine-readable-tag-precision sweep on the one
+      // surface it missed.
+      tags: visibleTags(post.tags),
       // Honor the post's parsed `author` frontmatter rather than hard-coding
       // the site name — posts carry distinct authors and the feed should
       // reflect them. Falls back to the site name when frontmatter omits it.
