@@ -37,6 +37,14 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: 'en',
     dir: 'ltr',
     display: 'standalone',
+    // Standard W3C manifest categories so app launchers, PWA catalogs, and
+    // install surfaces that group by category can classify the installed app
+    // instead of leaving it uncategorized. Both values are from the W3C
+    // manifest category registry; a writing-authenticity tool is squarely a
+    // productivity/utility. Additive, zero-risk metadata enrichment in the same
+    // spirit as the Organization `founder` / WebSite `inLanguage` / feed
+    // `icon`/`favicon` additions.
+    categories: ['productivity', 'utilities'],
     background_color: '#f5f0e8', // --cream
     theme_color: '#1e3a5f', // --deep-blue
     icons: [

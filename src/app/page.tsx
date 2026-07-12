@@ -26,6 +26,17 @@ export default function Home() {
         </div>
       </nav>
 
+      {/* Primary content wrapped in a <main> landmark. The landing page is the
+          most-crawled marketing surface, yet it was the one top-level page with
+          no <main> — the blog routes (via blog/layout.tsx), /success, and
+          /verify all already carry one. Without it a screen-reader user has no
+          "skip to main content" landmark to jump past the nav (WCAG 1.3.1 /
+          Lighthouse landmark best practice), and the document has no primary
+          region for assistive-tech document navigation. The <nav> and <footer>
+          stay outside it as their own landmarks; styling is unchanged.
+          Accessibility is an always-on cross-cutting investment, alongside the
+          §6.46 heading-hierarchy and list-semantics fixes on this same page. */}
+      <main>
       {/* Hero */}
       <section className="relative min-h-[75vh] flex flex-col items-center justify-center px-6">
         {/* Watermark */}
@@ -179,6 +190,7 @@ export default function Home() {
           </svg>
         </Link>
       </section>
+      </main>
 
       {/* Footer */}
       <footer className="border-t border-deep-blue/[0.06] py-8">

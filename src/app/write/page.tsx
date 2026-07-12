@@ -160,8 +160,12 @@ export default function WritePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd()) }}
       />
 
-      {/* Editor */}
-      <div className="flex-1 min-h-0 overflow-hidden">
+      {/* Editor. A <main> landmark rather than a bare <div>: the editor is the
+          page's primary content, and — like the homepage fix — /write was
+          missing the "skip to main content" landmark that /success, /verify, and
+          the blog routes already carry (WCAG 1.3.1). The <header> above stays its
+          own landmark; the flex layout is unchanged (same classes on <main>). */}
+      <main className="flex-1 min-h-0 overflow-hidden">
         {decision === 'pending' && draft ? (
           <ResumeBanner
             draft={draft}
@@ -177,7 +181,7 @@ export default function WritePage() {
             isSubmitting={isSubmitting}
           />
         ) : null}
-      </div>
+      </main>
     </div>
   );
 }

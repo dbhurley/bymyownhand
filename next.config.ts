@@ -33,6 +33,31 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         ],
       },
+      // Clickjacking protection for the interactive surfaces only. `/write` (the
+      // locked editor) and `/success/*` (the post-certification page) are never
+      // meant to be embedded in a third-party frame — a framed editor is a
+      // classic clickjacking vector (an attacker overlays it to capture or
+      // misdirect the writer's input), and neither page is part of the embed
+      // flywheel. `frame-ancestors 'self'` (modern CSP directive) plus the
+      // legacy `X-Frame-Options: SAMEORIGIN` fallback deny cross-origin framing
+      // while still allowing our own origin. Deliberately scoped, NOT site-wide:
+      // `/verify/<hash>`, the blog, and the marketing pages stay framable so the
+      // Phase 1.3 `iframe` embed-badge variant remains possible. On-theme with
+      // the Privacy/SOC2 cross-cutting investment and the existing header block.
+      {
+        source: "/write",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+        ],
+      },
+      {
+        source: "/success/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+        ],
+      },
     ];
   },
 };
