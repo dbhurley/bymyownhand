@@ -62,6 +62,16 @@ export async function generateMetadata({ params }: { params: Promise<{ hash: str
       title: pageTitle,
       description,
       type: 'article',
+      // Next.js replaces (does not deep-merge) the parent `openGraph` when this
+      // route resolves a document title and sets its own, so without these two
+      // the per-document proof card drops the root's `og:site_name` /
+      // `og:locale` — the same replace-not-merge gap just closed on the blog
+      // post card. (The no-DB / unknown-hash path returns only `alternates` and
+      // still inherits the full root card, so this matters only on the
+      // DB-backed branch.) Restore them so a shared proof link carries brand
+      // attribution and a locale hint like every other surface.
+      siteName: 'By My Own Hand',
+      locale: 'en_US',
       url: canonicalPath,
       images: ogShareImages('By My Own Hand'),
     },

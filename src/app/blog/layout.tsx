@@ -3,8 +3,14 @@ import Link from 'next/link';
 export default function BlogLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-cream flex flex-col">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 md:px-12 py-4 bg-white/90 backdrop-blur-md border-b border-deep-blue/5">
+      {/* Navigation. `aria-label` disambiguates this site-nav landmark from the
+          per-post breadcrumb `<nav aria-label="Breadcrumb">` that /blog/<slug>
+          also renders — two navigation landmarks on the same page must carry
+          distinct accessible names so a screen reader's landmark menu can tell
+          them apart (WCAG 1.3.1 / the Lighthouse "landmarks are unique" audit).
+          Always-on accessibility investment, same lineage as the breadcrumb-nav
+          label and the landing-page landmark fixes; no visual change. */}
+      <nav aria-label="Primary" className="sticky top-0 z-50 flex items-center justify-between px-6 md:px-12 py-4 bg-white/90 backdrop-blur-md border-b border-deep-blue/5">
         <Link href="/" className="flex items-center gap-3 hover:opacity-70 transition-opacity">
           <img src="/logo.svg" alt="By My Own Hand" width="28" height="25" className="block" />
           <span className="text-lg font-semibold text-deep-blue tracking-tight hidden sm:inline">By My Own Hand</span>
