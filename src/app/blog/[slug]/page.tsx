@@ -40,6 +40,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       title: post.title,
       description: post.excerpt,
       type: 'article',
+      // Restore `siteName` and `locale`. Next.js *replaces* (does not
+      // deep-merge) the parent `openGraph` when a route defines its own, so a
+      // blog post that sets `openGraph` for its article metadata silently drops
+      // the root's `og:site_name` ("By My Own Hand") and `og:locale` ("en_US")
+      // — verified absent in the prerendered post HTML while present on the
+      // homepage. A shared blog post therefore rendered a card with no brand
+      // attribution and no locale hint. Re-declaring them here brings the post
+      // card back in line with every other surface. Same replace-not-merge
+      // root cause as the §6.28/§6.35 image + Twitter-card restorations.
+      siteName: 'By My Own Hand',
+      locale: 'en_US',
       // og:url should be the page's own canonical URL, not the inherited root.
       url: canonicalPath,
       publishedTime: post.date,
@@ -112,6 +123,14 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
     datePublished: post.date,
     dateModified: post.date,
     description: post.excerpt,
+    // Declare the article's language so search engines have an explicit signal
+    // per post instead of inferring it. Matches every other language surface
+    // the site already declares — the WebSite JSON-LD `inLanguage` (§6.48), the
+    // JSON Feed `language`, `openGraph.locale` (`en_US`), and the document's own
+    // `<html lang="en">`. Additive, zero-risk enrichment on the 44+ post surface
+    // the sitemap ships — sibling of the WebSite `inLanguage` / Organization
+    // `founder` / `wordCount` additions in the same discovery-enrichment line.
+    inLanguage: 'en-US',
     // Advertise only the *visible* topical tags as keywords, not the raw set.
     // `visibleTags()` hides the project-meta boilerplate ("ByMyOwnHand",
     // "Next.js") from the tag chips and the related-posts scorer; the schema
