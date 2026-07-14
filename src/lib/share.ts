@@ -47,5 +47,15 @@ export function buildLinkedInShareUrl(verifyUrl: string): string {
 export const SHARE_IMAGE_PATH = '/icon-512x512.png';
 
 export function ogShareImages(alt: string) {
-  return [{ url: SHARE_IMAGE_PATH, width: 512, height: 512, alt }];
+  // Declare the image MIME type alongside the dimensions. `og:image:type` is a
+  // documented OpenGraph property some scrapers read to decide whether to fetch
+  // and how to decode the card image before rendering a preview; the asset is a
+  // PNG, so advertise it. Additive, zero-risk metadata enrichment that lands on
+  // all four card surfaces (`app/layout.tsx`, `app/blog/page.tsx`,
+  // `app/blog/[slug]/page.tsx`, `app/verify/[hash]/layout.tsx`) through this one
+  // helper — discovery-enrichment sibling of the Organization `founder` /
+  // WebSite `inLanguage` / BlogPosting `wordCount` / feed `icon`/`favicon`
+  // additions. (The Twitter card uses the bare `SHARE_IMAGE_PATH`; X infers the
+  // type itself, so it needs nothing here.)
+  return [{ url: SHARE_IMAGE_PATH, width: 512, height: 512, alt, type: 'image/png' }];
 }

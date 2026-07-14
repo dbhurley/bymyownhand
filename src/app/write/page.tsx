@@ -15,8 +15,14 @@ const LockedEditor = dynamic(() => import('@/components/LockedEditor'), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-full bg-cream">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-10 h-10 border-2 border-deep-blue/15 border-t-deep-blue/60 rounded-full animate-spin" />
+      {/* role="status" + aria-live so a screen-reader user is told the editor
+          is loading rather than landing on a silent blank surface (Monaco is a
+          heavy client bundle, so this fallback can show for a beat on a cold
+          load); the spinner is decorative and hidden from the a11y tree. Same
+          treatment as the /verify loading state (§6.36) and the /write submit
+          spinner — always-on cross-cutting accessibility investment. */}
+      <div className="flex flex-col items-center gap-4" role="status" aria-live="polite">
+        <div className="w-10 h-10 border-2 border-deep-blue/15 border-t-deep-blue/60 rounded-full animate-spin" aria-hidden="true" />
         <span className="text-deep-blue/40 text-sm">Preparing your writing environment...</span>
       </div>
     </div>
