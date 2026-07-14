@@ -93,16 +93,24 @@ export function DownloadCertificate({
       <button
         onClick={handleDownload}
         disabled={isGenerating}
+        // Announce the in-flight PDF generation to assistive tech: `aria-busy`
+        // marks the control as working while the (potentially slow) render +
+        // QR-encode runs, and the spinner / emoji are purely decorative so they
+        // stay out of the accessibility tree — the same treatment the /write
+        // submit spinner and the /verify loading spinner already carry. Without
+        // this a screen-reader user pressing Download got the "Generating..."
+        // label but no busy state and a spinner announced as unlabeled graphic.
+        aria-busy={isGenerating}
         className="flex items-center justify-center gap-2 px-6 py-3 bg-accent text-white rounded-lg font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
       >
         {isGenerating ? (
           <>
-            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true" />
             Generating...
           </>
         ) : (
           <>
-            <span>📄</span>
+            <span aria-hidden="true">📄</span>
             Download Certificate
           </>
         )}
