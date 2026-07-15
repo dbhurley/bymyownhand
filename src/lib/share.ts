@@ -55,7 +55,20 @@ export function ogShareImages(alt: string) {
   // `app/blog/[slug]/page.tsx`, `app/verify/[hash]/layout.tsx`) through this one
   // helper — discovery-enrichment sibling of the Organization `founder` /
   // WebSite `inLanguage` / BlogPosting `wordCount` / feed `icon`/`favicon`
-  // additions. (The Twitter card uses the bare `SHARE_IMAGE_PATH`; X infers the
-  // type itself, so it needs nothing here.)
+  // additions.
   return [{ url: SHARE_IMAGE_PATH, width: 512, height: 512, alt, type: 'image/png' }];
+}
+
+// The Twitter/X card image, carrying alt text. The card surfaces previously
+// passed the bare `SHARE_IMAGE_PATH` string, which emits `twitter:image` but no
+// `twitter:image:alt` — so a screen-reader user on X hears nothing where the
+// OpenGraph card (built via `ogShareImages(alt)`) already describes the same
+// asset. Twitter's card spec documents `twitter:image:alt`, and Next.js maps
+// the object form's `alt` to it. Sharing is a core success metric and the embed
+// flywheel puts these cards in front of new readers, so the shared artifact
+// should be accessible, not just decorative. Mirrors `ogShareImages(alt)` so
+// both cards describe the image from one place — the same single-source-of-truth
+// shape as that helper. (X infers the MIME type itself, so no `type` here.)
+export function twitterShareImages(alt: string) {
+  return [{ url: SHARE_IMAGE_PATH, alt }];
 }

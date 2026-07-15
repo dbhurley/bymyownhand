@@ -2,7 +2,7 @@ import { getAllPosts, getPostBySlug, getRelatedPosts, visibleTags } from '@/lib/
 import { formatPostDate } from '@/lib/date';
 import { breadcrumbJsonLd } from '@/lib/structuredData';
 import { getSiteUrl } from '@/lib/site';
-import { SHARE_IMAGE_PATH, ogShareImages } from '@/lib/share';
+import { ogShareImages, twitterShareImages } from '@/lib/share';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
@@ -79,7 +79,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       card: 'summary_large_image',
       title: post.title,
       description: post.excerpt,
-      images: [SHARE_IMAGE_PATH],
+      images: twitterShareImages(post.title),
     },
   };
 }
