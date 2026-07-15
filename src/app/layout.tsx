@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { getSiteUrl } from "@/lib/site";
-import { SHARE_IMAGE_PATH, ogShareImages } from "@/lib/share";
+import { ogShareImages, twitterShareImages } from "@/lib/share";
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-bricolage",
@@ -62,7 +62,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "By My Own Hand",
     description: "Prove your writing is authentically human — keystroke by keystroke.",
-    images: [SHARE_IMAGE_PATH],
+    images: twitterShareImages("By My Own Hand"),
   },
   robots: {
     index: true,

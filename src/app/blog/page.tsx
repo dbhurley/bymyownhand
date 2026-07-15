@@ -3,7 +3,7 @@ import { getAllPosts, getFeaturedPost, getCategories, getAllTags, visibleTags } 
 import { formatPostDate } from '@/lib/date';
 import { getSiteUrl } from '@/lib/site';
 import { organizationJsonLd, websiteJsonLd } from '@/lib/structuredData';
-import { SHARE_IMAGE_PATH, ogShareImages } from '@/lib/share';
+import { ogShareImages, twitterShareImages } from '@/lib/share';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Blog — Written by Hand, Read by All',
     description: 'Exploring authenticity, identity verification, and why human writing still matters in the age of AI.',
-    images: [SHARE_IMAGE_PATH],
+    images: twitterShareImages('By My Own Hand Blog'),
   },
 };
 
