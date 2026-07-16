@@ -154,7 +154,7 @@ export default function BlogPage() {
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd('By My Own Hand Blog', `${siteUrl}/blog`)) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd('By My Own Hand Blog', `${siteUrl}/blog`, 'Insights on human authenticity, writing verification, and identity in the age of AI.')) }}
       />
 
       {/* ── Main Content + Sidebar ── */}

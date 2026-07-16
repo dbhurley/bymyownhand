@@ -15,6 +15,15 @@ export function organizationJsonLd() {
   return {
     '@context': 'https://schema.org',
     '@type': 'Organization',
+    // A stable, resolvable node identifier so other JSON-LD on the same page can
+    // reference this Organization by `@id` instead of restating it. Google (and
+    // other consumers) merge every `<script type="application/ld+json">` block on
+    // a page into one graph, so the `WebSite` node's `publisher: { '@id': … }`
+    // below resolves to this entity. Anchored to the canonical site URL with a
+    // `#organization` fragment (the conventional entity-anchor form), so the id
+    // is stable across the three surfaces that emit this node (`/`, `/write`,
+    // `/blog`). Additive, zero-risk graph-linking enrichment.
+    '@id': `${siteUrl}/#organization`,
     name: 'By My Own Hand',
     url: siteUrl,
     // Raster logo, not `/logo.svg`. Google's structured-data image guidelines
@@ -80,16 +89,30 @@ export function breadcrumbJsonLd(postTitle: string) {
 }
 
 // The WebSite node the feed/index describes. `/` and `/write` use the root
-// defaults; `/blog` passes its own blog-scoped name and URL.
+// defaults; `/blog` passes its own blog-scoped name, URL, and description.
 export function websiteJsonLd(
   name: string = 'By My Own Hand',
   url: string = getSiteUrl(),
+  description: string = 'Prove your writing is authentically human — keystroke by keystroke. A lockdown editor captures every keystroke, blocks external paste, and produces a shareable proof of authorship.',
 ) {
+  const siteUrl = getSiteUrl();
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
+    // Stable node id (the site's own URL + `#website` anchor) so the entity is
+    // addressable within the page graph — the counterpart to the Organization
+    // `@id` above. `/blog` passes its own `url`, so its WebSite is a distinct
+    // `${siteUrl}/blog/#website` entity from the marketing root's.
+    '@id': `${url}/#website`,
     name,
     url,
+    // A short description for the site/blog entity, so search engines have
+    // entity-level context rather than only a name and URL — the same enrichment
+    // the Organization node already carries. `/` and `/write` describe the
+    // product; `/blog` overrides with its own blog-scoped description so the
+    // WebSite entity there reads as the blog, not the marketing site. Additive,
+    // zero-risk discovery-enrichment sibling of the Organization `description`.
+    description,
     // Declare the site's primary language so search engines have an explicit
     // language signal for the entity instead of inferring it from the page.
     // Matches the document's own `<html lang="en">` / `openGraph.locale`
@@ -98,5 +121,11 @@ export function websiteJsonLd(
     // one edit — discovery-enrichment sibling of the Organization `founder` /
     // `description` additions.
     inLanguage: 'en-US',
+    // Connect the site to its publishing organization by reference. Google's
+    // structured-data guidance recommends associating a WebSite with the
+    // Organization that publishes it; both nodes are emitted on the same page
+    // (`/`, `/write`, `/blog`), so the `@id` reference resolves within the merged
+    // page graph rather than restating the whole Organization object here.
+    publisher: { '@id': `${siteUrl}/#organization` },
   };
 }
