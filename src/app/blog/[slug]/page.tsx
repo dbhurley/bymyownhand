@@ -54,6 +54,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       // og:url should be the page's own canonical URL, not the inherited root.
       url: canonicalPath,
       publishedTime: post.date,
+      // Emit `article:modified_time` alongside `article:published_time`. The
+      // BlogPosting JSON-LD already declares `dateModified: post.date`, but the
+      // OpenGraph article card carried only `publishedTime` — so Facebook /
+      // LinkedIn and the OG-reading crawlers that use `article:modified_time`
+      // as a freshness signal had no modified date to read on the card, out of
+      // step with the structured data on the same page. Posts here are static
+      // (no separate edit timestamp in frontmatter), so it mirrors the publish
+      // date exactly as the JSON-LD `dateModified` does. Additive, zero-risk
+      // discovery-enrichment sibling of the `BlogPosting` `inLanguage` /
+      // `wordCount` and the OG `siteName`/`locale` restorations.
+      modifiedTime: post.date,
       authors: [authorName],
       // Emit only the visible topical tags as `article:tag`, not the project-
       // meta boilerplate (`ByMyOwnHand`, `Next.js`) `visibleTags()` already
