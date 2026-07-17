@@ -8,7 +8,10 @@ import { clearDraft, DRAFT_STORAGE_KEY, type DraftSnapshot } from '@/lib/draft';
 import { nanoid } from 'nanoid';
 
 interface LockedEditorProps {
-  onComplete: (session: WritingSession) => void;
+  // Resolves `true` once the session is actually certified, `false` if the
+  // submission failed. The editor keeps autosaving — and keeps the writer's
+  // localStorage draft — until it hears a definite `true`.
+  onComplete: (session: WritingSession) => Promise<boolean>;
   title: string;
   onTitleChange: (title: string) => void;
   initialDraft?: DraftSnapshot | null;
@@ -44,7 +47,6 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
   const [startedAt] = useState(() => initialDraft?.startTime ?? Date.now());
   const [elapsedTime, setElapsedTime] = useState(0);
   const [blockedPasteCount, setBlockedPasteCount] = useState(() => initialDraft?.blockedPasteCount ?? 0);
-  const [isRecording, setIsRecording] = useState(true);
 
   const eventsRef = useRef<KeystrokeEvent[]>(initialDraft?.events ?? []);
   const internalClipboard = useRef<string>('');
@@ -228,11 +230,30 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
     draftSnapshotRef.current = { title, content, blockedPasteCount };
   }, [title, content, blockedPasteCount]);
 
+  // Set once the certification is confirmed, at which point the draft has been
+  // cleared and must never be written back. A ref, not state: `handleSubmit`
+  // sets it and clears the draft in the same synchronous step, so no autosave
+  // tick can interleave between the two and resurrect the draft we just
+  // deleted. (A state flag would only stop the interval on the *next* render.)
+  const draftFinalizedRef = useRef(false);
+
+  // Autosave runs for the whole life of the editor, stopping only when a
+  // certification actually succeeds. It used to stop the moment `handleSubmit`
+  // fired (an `isRecording` flag it set to false), and `handleSubmit` also
+  // deleted the saved draft outright — both *before* the parent's POST
+  // /api/documents had succeeded. So a certification that failed (a dropped
+  // connection, a 500, the server-side word-count/trace gates) left the writer
+  // back in the editor with their localStorage draft already erased *and*
+  // autosave permanently off for the rest of the session: from then on,
+  // closing the tab lost everything. That is precisely the event Phase 1.1
+  // exists to prevent ("an accidental tab-close erases work — that single
+  // event kills retention"), and a failed submit is exactly when a writer is
+  // most likely to close the tab. Saving now continues across a failure.
   useEffect(() => {
-    if (!isRecording) return;
     if (typeof window === 'undefined') return;
 
     const persist = () => {
+      if (draftFinalizedRef.current) return;
       const { title: t, content: c, blockedPasteCount: b } = draftSnapshotRef.current;
       if (!c.trim() && !t.trim()) return;
       const snapshot: DraftSnapshot = {
@@ -260,11 +281,10 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
       window.clearInterval(interval);
       window.removeEventListener('beforeunload', persist);
     };
-  }, [sessionId, startedAt, isRecording]);
+  }, [sessionId, startedAt]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (isSubmitting) return;
-    setIsRecording(false);
 
     // Compute the writing window and word count live at submit time rather than
     // reading the React state. `elapsedTime` is refreshed only once per second
@@ -301,9 +321,15 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
       integrityScore,
     };
 
-    clearDraft();
-
-    onComplete(session);
+    // Drop the local draft only once the certification is confirmed. Marking it
+    // finalized *before* clearing (both synchronous, so nothing can run between
+    // them) stops the autosave interval from writing the draft straight back —
+    // which would leave the writer facing a "Resume where you left off?" banner
+    // for a piece they had just successfully certified.
+    if (await onComplete(session)) {
+      draftFinalizedRef.current = true;
+      clearDraft();
+    }
   };
 
   const progressPercent = Math.min(100, (wordCount / 10) * 100);
@@ -328,7 +354,13 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
             aria-label="Document title"
             className="text-lg font-semibold bg-transparent border-none outline-none text-deep-blue placeholder-deep-blue/25 w-full md:w-72 focus:placeholder-deep-blue/40 transition-colors"
           />
-          {isRecording && (
+          {/* Driven by the live submission state rather than a one-way flag the
+              submit handler flipped and nothing ever flipped back. The pill
+              still goes dark while a certification is in flight (unchanged
+              visually), but a *failed* certification now relights it — the
+              writer really is still recording, since keystroke capture runs off
+              the editor's own key handlers and never stopped. */}
+          {!isSubmitting && (
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="w-2 h-2 rounded-full bg-deep-blue/40 animate-pulse-recording" />
               <span className="text-xs font-medium text-deep-blue/35 uppercase tracking-wider">Recording</span>
