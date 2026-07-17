@@ -289,7 +289,20 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
             </div>
           </div>
           <div className="flex items-stretch gap-3">
-            <code className="flex-1 px-3 py-2.5 bg-deep-blue/[0.04] rounded-lg text-xs font-mono text-deep-blue/70 overflow-x-auto whitespace-nowrap">
+            {/* The snippet is longer than the box and scrolls horizontally
+                (`overflow-x-auto whitespace-nowrap`), but it held no focusable
+                element — so the only way to read the rest of it was to drag with
+                a mouse or trackpad. A scrollable region has to be reachable and
+                scrollable from the keyboard (WCAG 2.1.1); `tabIndex={0}` makes
+                it a tab stop the arrow keys then scroll, and the group role +
+                label give a screen reader something to announce when it lands
+                there rather than a bare unlabeled region. */}
+            <code
+              tabIndex={0}
+              role="group"
+              aria-label={`${embedFormat === 'markdown' ? 'Markdown' : 'HTML'} embed badge snippet`}
+              className="flex-1 px-3 py-2.5 bg-deep-blue/[0.04] rounded-lg text-xs font-mono text-deep-blue/70 overflow-x-auto whitespace-nowrap"
+            >
               {embedSnippet}
             </code>
             <button

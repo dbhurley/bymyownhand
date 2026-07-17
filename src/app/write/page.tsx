@@ -65,7 +65,10 @@ export default function WritePage() {
     setDecision('fresh');
   };
 
-  const handleComplete = async (session: WritingSession) => {
+  // Resolves `true` only when the document is actually certified. The editor
+  // holds the writer's localStorage draft until it gets that answer, so a
+  // failed certification no longer erases their only saved copy.
+  const handleComplete = async (session: WritingSession): Promise<boolean> => {
     setIsSubmitting(true);
     setError(null);
 
@@ -95,9 +98,11 @@ export default function WritePage() {
 
       // Redirect to success/verification page
       router.push(`/success/${data.verificationHash}`);
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setIsSubmitting(false);
+      return false;
     }
   };
 

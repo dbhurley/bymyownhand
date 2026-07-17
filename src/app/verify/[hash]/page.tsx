@@ -542,7 +542,18 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
             </div>
           </div>
           <div className="flex items-stretch gap-3">
-            <code className="flex-1 px-3 py-2.5 bg-deep-blue/[0.04] rounded-lg text-xs font-mono text-deep-blue/70 overflow-x-auto whitespace-nowrap">
+            {/* Keyboard-reachable scrollable region — see the matching comment
+                on /success. The snippet overflows its box horizontally, so
+                without a tab stop the remainder was mouse-drag-only (WCAG
+                2.1.1). It matters a little more here: /verify is the cold
+                visitor's entry point, where a reader who arrived from someone
+                else's badge copies their first one. */}
+            <code
+              tabIndex={0}
+              role="group"
+              aria-label={`${embedFormat === 'markdown' ? 'Markdown' : 'HTML'} embed badge snippet`}
+              className="flex-1 px-3 py-2.5 bg-deep-blue/[0.04] rounded-lg text-xs font-mono text-deep-blue/70 overflow-x-auto whitespace-nowrap"
+            >
               {embedSnippet}
             </code>
             <button
