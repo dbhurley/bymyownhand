@@ -42,6 +42,14 @@ export function organizationJsonLd() {
     // `/write`, `/blog`) advertise it consistently.
     description:
       'By My Own Hand certifies that a piece of writing was composed by a human, keystroke by keystroke — a lockdown editor captures every keystroke, blocks external paste, and produces a shareable proof of authorship.',
+    // The brand tagline as schema.org's recognized Organization `slogan` — a
+    // distinct field from `description` (the full explainer above). Grounded in
+    // the documented product tagline the marketing surfaces already show
+    // ("Your words deserve proof."), so not fabricated. Additive, zero-risk
+    // enrichment that lands on all three surfaces (`/`, `/write`, `/blog`)
+    // through this one helper — discovery-enrichment sibling of the `founder` /
+    // `description` additions.
+    slogan: 'Your words deserve proof.',
     // Attribute the organization to its founder so Google can connect the
     // knowledge-panel entity to the person behind it. Grounded in the site's
     // own `public/llms.txt`, which names David Hurley (dbhurley.com) as the
