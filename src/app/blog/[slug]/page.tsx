@@ -158,6 +158,20 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
     // additions.
     wordCount: post.wordCount,
     mainEntityOfPage: { '@type': 'WebPage', '@id': postUrl },
+    // Connect the post to the blog collection it belongs to. Google recognizes
+    // `isPartOf` on an Article/BlogPosting as the link to the publication, and
+    // it mirrors the WebSite↔Organization entity-graph linking (§6.56) at the
+    // article level. The Blog node is declared inline (with a stable `@id`
+    // matching the blog WebSite entity `/blog/#website` the index emits, its
+    // name, and URL) so the reference is self-contained and resolvable on the
+    // post page rather than a dangling `@id`. Additive, zero-risk
+    // discovery-enrichment sibling of the `inLanguage` / `wordCount` additions.
+    isPartOf: {
+      '@type': 'Blog',
+      '@id': `${siteUrl}/blog/#website`,
+      name: 'By My Own Hand Blog',
+      url: `${siteUrl}/blog`,
+    },
     image: imageUrl,
     author,
     publisher: {

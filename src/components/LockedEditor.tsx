@@ -470,6 +470,14 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
           <button
             onClick={handleSubmit}
             disabled={wordCount < 10 || isSubmitting}
+            // `aria-busy` while the certification POST is in flight. The header
+            // announces "Certifying…" via a role="status" region, but the button
+            // the writer just pressed only went `disabled` — indistinguishable to
+            // assistive tech from "not yet 10 words." Marking it busy tells a
+            // screen-reader user the control is working, not merely unavailable.
+            // Same treatment as the certificate Download button (§6.54); no
+            // visual change.
+            aria-busy={isSubmitting}
             className="group flex items-center gap-2 px-6 py-2.5 bg-deep-blue text-cream rounded-full font-medium text-sm
                        hover:bg-deep-blue/90 transition-all duration-200
                        disabled:opacity-30 disabled:cursor-not-allowed
