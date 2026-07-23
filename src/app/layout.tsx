@@ -89,6 +89,17 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
+        {/* iOS-specific home-screen label. When a reader adds the site to their
+            iOS home screen, Safari derives the icon's title from the page's
+            `<title>` — here the long "By My Own Hand | Prove Your Writing is
+            Human" — which truncates to something like "By My Own…". The
+            Web App Manifest's `short_name` ("BMOH") controls this on Android but
+            iOS Safari ignores the manifest for the label and reads this meta
+            instead. Set it to the same brand shorthand the manifest already
+            uses so the home-screen entry reads cleanly on both platforms.
+            Mobile-PWA polish sibling of the `theme-color` / manifest `short_name`
+            work; the majority of traffic is mobile. */}
+        <meta name="apple-mobile-web-app-title" content="BMOH" />
         {/* Brand deep-blue (--deep-blue) for the mobile browser chrome / PWA
             title bar, matching the `theme_color` in app/manifest.ts. Without
             it the address-bar tints to a default, off-brand color on Android
