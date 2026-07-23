@@ -172,12 +172,23 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
       name: 'By My Own Hand Blog',
       url: `${siteUrl}/blog`,
     },
-    image: imageUrl,
+    // Declare the Article `image` and the publisher `logo` as fully-specified
+    // ImageObjects carrying `width`/`height`, not a bare URL (for `image`) or a
+    // dimensionless ImageObject (for `logo`). Google's Article rich-result
+    // guidance treats the logo as an ImageObject and reads the image's declared
+    // dimensions to decide crop/eligibility; supplying them saves the crawler a
+    // fetch-and-measure and lets it qualify the asset without guessing. The
+    // numbers are the intrinsic size of the `/icon-512x512.png` asset `imageUrl`
+    // already points at (512×512 — the same size the PWA manifest and OG cards
+    // declare for it), so they're grounded, not fabricated. Additive, zero-risk
+    // discovery-enrichment sibling of the `inLanguage` / `wordCount` / `isPartOf`
+    // additions on the 44+ post surface the sitemap ships.
+    image: { '@type': 'ImageObject', url: imageUrl, width: 512, height: 512 },
     author,
     publisher: {
       '@type': 'Organization',
       name: 'By My Own Hand',
-      logo: { '@type': 'ImageObject', url: imageUrl },
+      logo: { '@type': 'ImageObject', url: imageUrl, width: 512, height: 512 },
     },
   };
 

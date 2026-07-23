@@ -22,6 +22,17 @@ export default function robots(): MetadataRoute.Robots {
   // a discovery surface (the JSON Feed) we *want* found.
   return {
     rules: [{ userAgent: '*', allow: '/', disallow: ['/success/', '/api/documents/'] }],
+    // Declare the site's canonical host. Crawlers that honor the `Host`
+    // directive (Yandex most notably) use it to pick one preferred mirror when
+    // the same content is reachable on multiple hostnames (apex vs. www, a
+    // Vercel preview domain vs. the production domain), consolidating ranking
+    // signals onto it instead of splitting them. Resolved through the same
+    // `getSiteUrl()` helper as the sitemap so staging and custom domains
+    // advertise *their own* host rather than production's, and emitted as the
+    // bare hostname (the form the directive expects) rather than the full URL.
+    // Additive, zero-risk discovery hint in the same crawl-honesty spirit as the
+    // /success + /api/documents disallows and the sitemap freshness fixes.
+    host: new URL(base).host,
     sitemap: `${base}/sitemap.xml`,
   };
 }
