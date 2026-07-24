@@ -65,6 +65,50 @@ export function organizationJsonLd() {
   };
 }
 
+// SoftwareApplication/WebApplication node for the marketing homepage. The site
+// emits Organization + WebSite entities, but nothing typed the product itself as
+// the *application* it is — the schema.org type Google reads to understand a
+// free, browser-based tool (and the one that can qualify a page for the app
+// rich result). Grounded, not fabricated: the tool runs entirely in the browser
+// (`operatingSystem: 'Any'`, no install), needs JavaScript (Monaco), is squarely
+// a productivity app (the same category the PWA manifest declares), and is free
+// to use with no account on the MVP path — so `isAccessibleForFree` + a zero-
+// price `Offer` describe the real pricing. `publisher` references the
+// Organization node by `@id` so it resolves within the same page's merged graph
+// (the homepage emits `organizationJsonLd()` alongside this) rather than
+// restating it. Additive, zero-risk discovery-enrichment sibling of the
+// Organization `founder`/`slogan` and WebSite `inLanguage` additions — the app
+// rich-result surface those never reached.
+export function webApplicationJsonLd() {
+  const siteUrl = getSiteUrl();
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    '@id': `${siteUrl}/#webapp`,
+    name: 'By My Own Hand',
+    url: siteUrl,
+    applicationCategory: 'ProductivityApplication',
+    // Browser-based — runs on any OS with a modern browser, nothing to install.
+    operatingSystem: 'Any',
+    browserRequirements: 'Requires JavaScript.',
+    description:
+      'A lockdown writing editor that captures every keystroke with millisecond timing, blocks external paste, and produces a shareable, tamper-evident proof that a piece of writing was composed by a human.',
+    inLanguage: 'en-US',
+    // Free to use, no account required on the MVP path. `isAccessibleForFree`
+    // plus a zero-price Offer is schema.org's recognized way to declare a free
+    // application, so consumers don't have to infer the pricing.
+    isAccessibleForFree: true,
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+    },
+    // Reference the Organization emitted on the same page by `@id` rather than
+    // restating it — the merged page graph resolves it.
+    publisher: { '@id': `${siteUrl}/#organization` },
+  };
+}
+
 // BreadcrumbList for a blog post. The post page already renders a *visible*
 // breadcrumb ("Blog / <title>"), but with no matching structured data Google
 // can't render the breadcrumb rich result — the crawler sees a flat page with
