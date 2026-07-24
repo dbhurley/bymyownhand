@@ -25,6 +25,16 @@ export const metadata: Metadata = {
   },
   description: "Certify your writing was created by your own hands. Block AI, capture keystrokes, prove authenticity.",
   applicationName: "By My Own Hand",
+  // Org-level attribution meta (`<meta name="creator">` / `<meta name="publisher">`).
+  // `creator` is the product's creator — David Hurley, grounded in the site's own
+  // public/llms.txt and matching the Organization JSON-LD `founder`; `publisher`
+  // is the organization behind every page. Both are org-level, so they stay
+  // correct for the routes that inherit this metadata (unlike per-post `authors`,
+  // deliberately omitted so a guest-authored blog post isn't mis-attributed).
+  // Additive, zero-risk attribution enrichment in the Organization `founder` /
+  // `slogan` lineage.
+  creator: "David Hurley",
+  publisher: "By My Own Hand",
   keywords: [
     "human writing",
     "AI detection",

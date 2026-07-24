@@ -397,7 +397,22 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
               </button>
             </div>
           </div>
-          <div className="p-6 min-h-[200px] max-h-[400px] overflow-y-auto text-[0.95rem] leading-relaxed whitespace-pre-wrap text-deep-blue/80">
+          {/* Keyboard-reachable scrollable region. The content is capped at
+              max-h-[400px] with overflow-y-auto, so a long certified piece
+              scrolls inside this box — but with no focusable element the
+              remainder was mouse-wheel/drag-only (WCAG 2.1.1 / the Lighthouse
+              "scrollable region must have keyboard access" audit, the same gap
+              the embed-snippet fix closed). tabIndex={0} makes it a tab stop the
+              arrow keys scroll; role="group" + aria-label give a screen reader
+              something to announce on arrival. Matters on this cold-visitor
+              proof surface, where a reader who can't use a mouse still needs to
+              read the whole piece being verified. */}
+          <div
+            tabIndex={0}
+            role="group"
+            aria-label="Certified document text"
+            className="p-6 min-h-[200px] max-h-[400px] overflow-y-auto text-[0.95rem] leading-relaxed whitespace-pre-wrap text-deep-blue/80"
+          >
             {isPlaying ? (
               <>
                 {playbackText}

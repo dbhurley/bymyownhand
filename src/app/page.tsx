@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { organizationJsonLd, websiteJsonLd } from '@/lib/structuredData';
+import { organizationJsonLd, websiteJsonLd, webApplicationJsonLd } from '@/lib/structuredData';
 
 export default function Home() {
   return (
@@ -221,6 +221,16 @@ export default function Home() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd()) }}
+      />
+
+      {/* SoftwareApplication node so search engines understand the product as
+          the free, browser-based writing tool it is (and can qualify the page
+          for the app rich result). Emitted only on the homepage — the surface
+          that best represents the app — alongside the Organization it references
+          by @id. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webApplicationJsonLd()) }}
       />
     </div>
   );
