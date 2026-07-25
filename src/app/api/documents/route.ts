@@ -11,7 +11,27 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { title, session } = body as { title: string; session: WritingSession };
 
-    if (!title || !session || !session.content) {
+    // Check the *types* of the two string fields, not just their truthiness.
+    // The previous `!title || !session || !session.content` gate admitted any
+    // truthy value, so a malformed payload (`title: 123`, `content: { … }`, an
+    // array) sailed past it and then threw a TypeError deeper in the handler —
+    // `title.trim()` on a number, `content.trim()` inside `countWords()` — which
+    // the outer catch turned into a `500 Failed to create document`. A caller
+    // sending the wrong type got a server-error status for what is squarely a
+    // client error, and every such request logged as if the service had broken.
+    // Actionable 4xx responses matter more once the documented Phase 2.1 public
+    // API exposes this contract to partners who aren't our own web client.
+    // Same trust-boundary shape as the server-side wordCount / title /
+    // writingTimeMs / trace-size gates below — the server is canonical for what
+    // it admits.
+    if (typeof title !== 'string' || !title) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    if (!session || typeof session !== 'object' || typeof session.content !== 'string' || !session.content) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }

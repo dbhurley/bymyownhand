@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic';
 import type { WritingSession } from '@/lib/types';
 import { computeWpm, formatDuration, getScoreLabel, getSessionWritingTime } from '@/lib/metrics';
 import { buildEmbedSnippets } from '@/lib/embed';
-import { recordCertification, type StreakSummary } from '@/lib/history';
+import { getRecentCertifications, recordCertification, type CertificationRecord, type StreakSummary } from '@/lib/history';
 import { buildVerifyUrl } from '@/lib/site';
 import { buildLinkedInShareUrl, buildTweetUrl } from '@/lib/share';
 import { writeClipboard } from '@/lib/clipboard';
@@ -33,6 +33,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
   const [embedCopied, setEmbedCopied] = useState(false);
   const [embedFormat, setEmbedFormat] = useState<'markdown' | 'html'>('markdown');
   const [streakSummary, setStreakSummary] = useState<StreakSummary | null>(null);
+  const [recentProofs, setRecentProofs] = useState<CertificationRecord[]>([]);
 
   useEffect(() => {
     const stored = sessionStorage.getItem('lastSession');
@@ -79,8 +80,13 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
       certifiedAt: Date.now(),
       wordCount: parsed.wordCount || 0,
       integrityScore: parsed.integrityScore || 0,
+      title: parsed.title,
     });
     setStreakSummary(summary);
+    // Read the recall list *after* recording, and exclude the piece this page
+    // is already about, so the list is strictly "everything else you've
+    // certified on this device."
+    setRecentProofs(getRecentCertifications(5, parsed.verificationHash));
   }, [hash, router]);
 
   const verifyUrl = buildVerifyUrl(hash);
@@ -121,7 +127,12 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
         {/* Success header */}
         <div className="text-center mb-12">
           <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-6">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="text-success">
+            {/* Decorative: the adjacent "Document Certified" heading already
+                carries the meaning, so exposing this checkmark as an unlabeled
+                graphic only adds noise for a screen reader. Same treatment as
+                the certificate Download button's icons (§6.54) and the
+                loading-spinner icons across /write and /verify (§6.55). */}
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="text-success" aria-hidden="true">
               <path d="M10 16L14 20L22 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
@@ -208,14 +219,17 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
             >
               {copied ? (
                 <>
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  {/* Decorative — the button's own "Copied" / "Copy" text is the
+                      accessible name; an unlabeled inline graphic beside it only
+                      adds noise. */}
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path d="M4 8L7 11L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   Copied
                 </>
               ) : (
                 <>
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <rect x="5" y="5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
                     <path d="M11 3H4C3.44772 3 3 3.44772 3 4V11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>
@@ -350,6 +364,66 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
             </Link>
           </div>
         </div>
+
+        {/* Your other proofs — Phase 1.4/1.2 staged rollout. `lib/history.ts`
+            has recorded every certification on this device since the streak
+            pill shipped, but nothing ever read those records back, so a writer
+            who closed the tab without copying a link had no way to reach that
+            proof again: the document is certified and the local record of it is
+            right here, yet the URL was unrecoverable. Recalling the list turns
+            this page into the pre-accounts stand-in for the `/u/<handle>`
+            portfolio in Phase 1.2 — and gives a returning writer a reason to
+            treat their certified pieces as a body of work rather than one-shot
+            links. Local-first, so it renders only after the mount effect reads
+            localStorage (nothing to hydrate-mismatch), and it migrates with the
+            rest of `history.ts` when accounts land. */}
+        {recentProofs.length > 0 && (
+          <div className="mt-14">
+            <div className="flex items-baseline justify-between mb-4">
+              <h2 className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em]">
+                Your other proofs
+              </h2>
+              {streakSummary && streakSummary.total > recentProofs.length + 1 && (
+                <span className="text-xs text-deep-blue/30">
+                  showing {recentProofs.length} of {streakSummary.total - 1}
+                </span>
+              )}
+            </div>
+            <ul className="bg-white rounded-2xl border border-deep-blue/[0.06] overflow-hidden divide-y divide-deep-blue/[0.04]">
+              {recentProofs.map(proof => (
+                <li key={proof.hash}>
+                  <Link
+                    href={`/verify/${proof.hash}`}
+                    className="flex items-center justify-between gap-4 px-5 md:px-6 py-3.5 hover:bg-deep-blue/[0.02] transition-colors"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm text-deep-blue/75 truncate">
+                        {/* Records written before titles were kept fall back to
+                            the hash, which is still a meaningful handle. */}
+                        {proof.title || proof.hash}
+                      </span>
+                      <span className="block text-xs text-deep-blue/35 mt-0.5">
+                        {new Date(proof.certifiedAt).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                        {' · '}
+                        {proof.wordCount} word{proof.wordCount === 1 ? '' : 's'}
+                      </span>
+                    </span>
+                    <span className={`text-sm font-semibold flex-shrink-0 tabular-nums ${getScoreLabel(proof.integrityScore).color}`}>
+                      {proof.integrityScore}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-deep-blue/35 mt-3">
+              Kept on this device only — no account needed, nothing uploaded.
+            </p>
+          </div>
+        )}
 
         {/* Writing analysis */}
         {session?.metrics && (

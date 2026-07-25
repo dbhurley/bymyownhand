@@ -485,7 +485,9 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
           >
             Complete
             {wordCount >= 10 && !isSubmitting && (
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="group-hover:translate-x-0.5 transition-transform">
+              // Decorative — "Complete" is the button's accessible name; the
+              // arrow is a hover affordance, not information.
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="group-hover:translate-x-0.5 transition-transform">
                 <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             )}

@@ -10,11 +10,19 @@ import { isValidVerificationHash } from './hash';
 const HISTORY_STORAGE_KEY = 'bmoh:history:v1';
 const MAX_ENTRIES = 500;
 
+// Titles are capped on write so one pathological entry can't crowd the
+// (finite) localStorage budget the whole history shares. The server already
+// caps a certified title at 200 chars, so this never truncates a real one.
+const MAX_TITLE_LENGTH = 200;
+
 export interface CertificationRecord {
   hash: string;
   certifiedAt: number; // ms epoch
   wordCount: number;
   integrityScore: number;
+  // Optional so records written before the recall list shipped stay valid —
+  // they simply render by hash. Never rely on it being present.
+  title?: string;
 }
 
 export interface StreakSummary {
@@ -62,7 +70,10 @@ function isValidRecord(value: unknown): value is CertificationRecord {
     (r.wordCount as number) >= 0 &&
     Number.isFinite(r.integrityScore) &&
     (r.integrityScore as number) >= 0 &&
-    (r.integrityScore as number) <= 100
+    (r.integrityScore as number) <= 100 &&
+    // Optional, but must be a string when present: a non-string title would
+    // reach the recall list's `.trim()` and throw inside the render.
+    (r.title === undefined || typeof r.title === 'string')
   );
 }
 
@@ -86,7 +97,8 @@ export function recordCertification(record: CertificationRecord): StreakSummary 
   const history = readHistory();
   if (!isValidRecord(record)) return summarize(history);
   if (!history.some(r => r.hash === record.hash)) {
-    history.push(record);
+    const title = record.title?.trim().slice(0, MAX_TITLE_LENGTH);
+    history.push({ ...record, title: title || undefined });
     writeHistory(history);
   }
   return summarize(history);
@@ -94,6 +106,25 @@ export function recordCertification(record: CertificationRecord): StreakSummary 
 
 export function getStreakSummary(): StreakSummary {
   return summarize(readHistory());
+}
+
+// The writer's own certified pieces, newest first. Without accounts (Phase 1.2)
+// a verification URL is recoverable only if the writer kept it — close the tab
+// without copying the link and the proof is effectively lost, even though the
+// document is certified and the local record of it is right here. This is the
+// same staged-rollout shape as the streak pill: recall the pieces from the
+// local-first record today, sync them to a real `/u/<handle>` portfolio when
+// accounts land. `excludeHash` lets a caller drop the piece it is already
+// showing (the just-certified one on `/success/<hash>`).
+export function getRecentCertifications(limit = 5, excludeHash?: string): CertificationRecord[] {
+  return readHistory()
+    .filter(r => r.hash !== excludeHash)
+    // `readHistory()` returns insertion order, which is *usually* chronological
+    // — but a device whose clock was corrected backwards, or a future
+    // server-synced merge, can break that. Sort on the recorded timestamp so
+    // "newest first" is true by construction rather than by assumption.
+    .sort((a, b) => b.certifiedAt - a.certifiedAt)
+    .slice(0, Math.max(0, limit));
 }
 
 function summarize(history: CertificationRecord[]): StreakSummary {

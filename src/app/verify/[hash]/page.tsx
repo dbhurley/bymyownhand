@@ -234,7 +234,10 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
         </header>
         <main className="max-w-2xl mx-auto px-6 md:px-8 py-16 text-center">
           <div className="w-14 h-14 rounded-full bg-deep-blue/5 flex items-center justify-center mx-auto mb-6">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-deep-blue/30">
+            {/* Decorative — the "Document Not Found" heading below carries the
+                meaning. Hidden from the a11y tree like the sibling spinner and
+                chevron icons on this page. */}
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-deep-blue/30" aria-hidden="true">
               <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
@@ -303,7 +306,8 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
           <span className="font-semibold text-deep-blue">By My Own Hand</span>
         </Link>
         <div className="flex items-center gap-2 text-success">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          {/* Decorative — the adjacent "Verified" label is the meaning. */}
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path d="M4 8L7 11L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           <span className="text-sm font-medium">Verified</span>
@@ -314,7 +318,9 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
         {/* Document header */}
         <div className="flex items-start gap-4 mb-10">
           <div className="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-success">
+            {/* Decorative — the document title and the "Certified as
+                authentically human-written" line beside it carry the meaning. */}
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-success" aria-hidden="true">
               <path d="M6 10L9 13L14 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
@@ -488,14 +494,16 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
             >
               {copied ? (
                 <>
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  {/* Decorative — the button's own "Link copied" / "Copy link"
+                      text is the accessible name. */}
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path d="M4 8L7 11L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   Link copied
                 </>
               ) : (
                 <>
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <rect x="5" y="5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
                     <path d="M11 3H4C3.44772 3 3 3.44772 3 4V11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>
