@@ -192,6 +192,21 @@ export default function WritePage() {
             isSubmitting={isSubmitting}
           />
         ) : null}
+      
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: `{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How does By My Own Hand prove writing is human?","acceptedAnswer":{"@type":"Answer","text":"By My Own Hand records keystroke-level writing activity in real time, capturing the natural rhythm, edits, and pauses of human composition. This produces a verifiable authorship record that demonstrates the text was typed by a person rather than generated or pasted by AI."}},{"@type":"Question","name":"Does By My Own Hand block AI-generated text?","acceptedAnswer":{"@type":"Answer","text":"Yes. The writing environment blocks pasting and AI-assisted insertion, so every character must be typed by hand. This ensures the resulting certificate reflects genuine human authorship."}},{"@type":"Question","name":"What does the authenticity certificate include?","acceptedAnswer":{"@type":"Answer","text":"The certificate includes a timestamped keystroke record, the total writing duration, and a verifiable proof that the document was composed manually without AI assistance or pasted content."}},{"@type":"Question","name":"Who uses By My Own Hand?","acceptedAnswer":{"@type":"Answer","text":"Students, educators, journalists, and professionals use By My Own Hand to certify that essays, articles, and applications were written by a human, providing trustworthy proof of authenticity in an era of AI-generated text."}}]}` }}
+      />
+      
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: `{"@context":"https://schema.org","@type":"SoftwareApplication","name":"By My Own Hand","url":"https://bymyownhand.com/write","applicationCategory":"ProductivityApplication","operatingSystem":"Web","description":"A writing tool that captures keystrokes and blocks AI to certify that text was created by a human, producing a verifiable authenticity certificate.","featureList":["Real-time keystroke capture","AI and paste blocking","Timestamped authorship certificate","Human-authorship verification"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}` }}
+      />
+      
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: `{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://bymyownhand.com/"},{"@type":"ListItem","position":2,"name":"Write","item":"https://bymyownhand.com/write"}]}` }}
+      />
       </main>
     </div>
   );
