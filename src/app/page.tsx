@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { organizationJsonLd, websiteJsonLd, webApplicationJsonLd } from '@/lib/structuredData';
+import { YourProofs } from '@/components/YourProofs';
 
 export default function Home() {
   return (
@@ -70,6 +71,13 @@ export default function Home() {
           </Link>
         </div>
       </section>
+
+      {/* A returning writer's own certified pieces, recalled from the local-first
+          history. Renders nothing (not even its divider) on a device with no
+          history, so the marketing page is untouched for first-time visitors and
+          crawlers — see components/YourProofs.tsx for why the homepage is the
+          surface that needed it. */}
+      <YourProofs />
 
       {/* Ornamental divider */}
       <Divider />
