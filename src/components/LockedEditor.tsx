@@ -48,6 +48,26 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
   const [elapsedTime, setElapsedTime] = useState(0);
   const [blockedPasteCount, setBlockedPasteCount] = useState(() => initialDraft?.blockedPasteCount ?? 0);
 
+  // A blocked paste used to be silent at the point of action: the toolbar's
+  // "N pastes blocked" counter appears at the top of the screen while the
+  // writer's attention is on the cursor, so pressing Cmd+V and having nothing
+  // appear reads as a broken editor rather than the lockdown working as
+  // designed. Flash a brief, calm explanation where the writing is happening —
+  // the block is the product's core promise, so it should be legible the moment
+  // it fires, not inferred from a counter. `role="status"` + `aria-live` so a
+  // screen-reader user hears it too (a blocked paste is otherwise entirely
+  // invisible to assistive tech).
+  const [pasteBlockedNotice, setPasteBlockedNotice] = useState(false);
+  const pasteNoticeTimer = useRef<number | null>(null);
+  const flashPasteBlocked = useCallback(() => {
+    setPasteBlockedNotice(true);
+    if (pasteNoticeTimer.current) window.clearTimeout(pasteNoticeTimer.current);
+    pasteNoticeTimer.current = window.setTimeout(() => setPasteBlockedNotice(false), 3000);
+  }, []);
+  useEffect(() => () => {
+    if (pasteNoticeTimer.current) window.clearTimeout(pasteNoticeTimer.current);
+  }, []);
+
   const eventsRef = useRef<KeystrokeEvent[]>(initialDraft?.events ?? []);
   const internalClipboard = useRef<string>('');
   // Type the editor ref from the OnMount callback's own first parameter rather
@@ -101,6 +121,7 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
         } else {
           // Block external paste
           setBlockedPasteCount(prev => prev + 1);
+          flashPasteBlocked();
           recordEvent({
             type: 'paste_blocked',
             pos: editor.getPosition()?.column || 0,
@@ -201,6 +222,7 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
       e.preventDefault();
       e.stopPropagation();
       setBlockedPasteCount(prev => prev + 1);
+      flashPasteBlocked();
       recordEvent({
         type: 'paste_blocked',
         pos: editor.getPosition()?.column || 0,
@@ -426,6 +448,22 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
             e.stopPropagation();
           }}
         />
+
+        {/* Blocked-paste notice. Sits at the bottom of the writing surface,
+            close to where the cursor and the writer's attention are, and fades
+            itself out after 3s so it never becomes chrome. Pointer-events are
+            off so it can't intercept a click into the editor. */}
+        {pasteBlockedNotice && (
+          <div className="absolute bottom-6 left-0 right-0 flex justify-center px-6 pointer-events-none">
+            <div
+              role="status"
+              aria-live="polite"
+              className="max-w-sm px-4 py-2.5 bg-deep-blue text-cream text-xs leading-relaxed text-center rounded-full shadow-lg shadow-deep-blue/20"
+            >
+              External paste blocked — your words have to be typed here.
+            </div>
+          </div>
+        )}
 
         {/* Empty state hint */}
         {wordCount === 0 && (

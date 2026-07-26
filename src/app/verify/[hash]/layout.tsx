@@ -31,19 +31,35 @@ import { ogShareImages, twitterShareImages } from '@/lib/share';
 //     future work; this gets the per-document *title* into the card today.
 export async function generateMetadata({ params }: { params: Promise<{ hash: string }> }): Promise<Metadata> {
   const { hash } = await params;
-  const valid = isValidVerificationHash(hash);
-  const canonicalPath = valid ? `/verify/${hash}` : '/verify';
+
+  // A hash that can't have been minted by `generateVerificationHash()` (a
+  // truncated share link, a crawler probing `/verify/<garbage>`) always renders
+  // the client "Document Not Found" state — with a 200, because the page is
+  // client-rendered and can't call `notFound()`. That is a soft 404, and this
+  // branch used to hand crawlers a canonical pointing at `/verify`, which isn't
+  // a route at all (only `/verify/<hash>` exists), so the page advertised a
+  // canonical URL that itself 404s. Mark these `noindex` instead and declare no
+  // canonical: the surface has nothing to index, and `follow` stays on so the
+  // links back into the site are still crawled. Only the *format-invalid* case
+  // is excluded — a well-formed hash stays indexable even when it can't be
+  // resolved here (the MVP no-DB path resolves nothing server-side yet renders a
+  // real proof for its author), so no legitimate proof link is affected. Same
+  // crawl-budget honesty as the `/success` + `/api/documents` disallows and the
+  // sitemap freshness fixes.
+  if (!isValidVerificationHash(hash)) {
+    return { robots: { index: false } };
+  }
+
+  const canonicalPath = `/verify/${hash}`;
 
   let docTitle: string | null = null;
-  if (valid) {
-    try {
-      const doc = await getDocumentByHash(hash);
-      if (doc && typeof doc.title === 'string' && doc.title.trim()) {
-        docTitle = doc.title.trim();
-      }
-    } catch {
-      // No DB / lookup failure — fall through to the generic share card.
+  try {
+    const doc = await getDocumentByHash(hash);
+    if (doc && typeof doc.title === 'string' && doc.title.trim()) {
+      docTitle = doc.title.trim();
     }
+  } catch {
+    // No DB / lookup failure — fall through to the generic share card.
   }
 
   // No resolvable document (the common MVP no-DB path, or an unknown hash):
