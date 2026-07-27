@@ -20,7 +20,7 @@ export default function Home() {
             className="group flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-deep-blue border border-deep-blue/15 rounded-full hover:border-deep-blue hover:bg-deep-blue hover:text-cream transition-all duration-300"
           >
             Start Writing
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="group-hover:translate-x-0.5 transition-transform">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="group-hover:translate-x-0.5 transition-transform" aria-hidden="true">
               <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </Link>
@@ -65,7 +65,7 @@ export default function Home() {
             className="group inline-flex items-center gap-3 px-8 py-4 bg-deep-blue text-cream text-lg font-medium rounded-full hover:bg-deep-blue/90 transition-all duration-300 shadow-lg shadow-deep-blue/10 hover:shadow-xl hover:shadow-deep-blue/20 hover:-translate-y-0.5"
           >
             Begin Writing
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="group-hover:translate-x-0.5 transition-transform">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="group-hover:translate-x-0.5 transition-transform" aria-hidden="true">
               <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </Link>
@@ -193,7 +193,7 @@ export default function Home() {
           className="group inline-flex items-center gap-3 px-10 py-4 bg-deep-blue text-cream text-lg font-medium rounded-full hover:bg-deep-blue/90 transition-all duration-300 shadow-lg shadow-deep-blue/10"
         >
           Start Your Certification
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="group-hover:translate-x-0.5 transition-transform">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="group-hover:translate-x-0.5 transition-transform" aria-hidden="true">
             <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </Link>

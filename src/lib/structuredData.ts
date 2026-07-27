@@ -65,7 +65,7 @@ export function organizationJsonLd() {
   };
 }
 
-// SoftwareApplication/WebApplication node for the marketing homepage. The site
+// SoftwareApplication/WebApplication node for the app surfaces. The site
 // emits Organization + WebSite entities, but nothing typed the product itself as
 // the *application* it is — the schema.org type Google reads to understand a
 // free, browser-based tool (and the one that can qualify a page for the app
@@ -79,14 +79,20 @@ export function organizationJsonLd() {
 // restating it. Additive, zero-risk discovery-enrichment sibling of the
 // Organization `founder`/`slogan` and WebSite `inLanguage` additions — the app
 // rich-result surface those never reached.
-export function webApplicationJsonLd() {
+//
+// `url` defaults to the site root (the homepage represents the product) but
+// `/write` passes its own URL, since that page *is* the application. Both
+// surfaces share the one stable `@id`, so they describe a single entity rather
+// than two competing app nodes — `/write` previously emitted a second,
+// hand-rolled `SoftwareApplication` object with hard-coded production URLs.
+export function webApplicationJsonLd(url: string = getSiteUrl()) {
   const siteUrl = getSiteUrl();
   return {
     '@context': 'https://schema.org',
     '@type': 'WebApplication',
     '@id': `${siteUrl}/#webapp`,
     name: 'By My Own Hand',
-    url: siteUrl,
+    url,
     applicationCategory: 'ProductivityApplication',
     // Browser-based — runs on any OS with a modern browser, nothing to install.
     operatingSystem: 'Any',
@@ -94,6 +100,16 @@ export function webApplicationJsonLd() {
     description:
       'A lockdown writing editor that captures every keystroke with millisecond timing, blocks external paste, and produces a shareable, tamper-evident proof that a piece of writing was composed by a human.',
     inLanguage: 'en-US',
+    // The capabilities the product actually ships (§6 of the PRD), so an answer
+    // engine reading this node can describe the tool without inferring it from
+    // marketing prose. Kept factual — every entry maps to shipped behavior in
+    // `LockedEditor` / `lib/metrics.ts` / `/verify/<hash>`.
+    featureList: [
+      'Real-time keystroke capture with millisecond timing',
+      'External paste and drag-drop blocking',
+      'Keystroke-by-keystroke playback of the writing session',
+      'Shareable verification link and downloadable certificate',
+    ],
     // Free to use, no account required on the MVP path. `isAccessibleForFree`
     // plus a zero-price Offer is schema.org's recognized way to declare a free
     // application, so consumers don't have to infer the pricing.
@@ -109,34 +125,84 @@ export function webApplicationJsonLd() {
   };
 }
 
+// A BreadcrumbList from an ordered trail. `item` is omitted on any crumb
+// without a `path` — per Google's guidance the current page shouldn't link to
+// itself in the trail — and every path resolves through getSiteUrl() so a
+// staging or preview host advertises its own trail rather than production's.
+export function breadcrumbListJsonLd(trail: { name: string; path?: string }[]) {
+  const siteUrl = getSiteUrl();
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: trail.map((crumb, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: crumb.name,
+      ...(crumb.path ? { item: `${siteUrl}${crumb.path}` } : {}),
+    })),
+  };
+}
+
 // BreadcrumbList for a blog post. The post page already renders a *visible*
 // breadcrumb ("Blog / <title>"), but with no matching structured data Google
 // can't render the breadcrumb rich result — the crawler sees a flat page with
 // no trail back to the section index. This mirrors the on-page trail exactly
 // (Blog → the post) so the machine-readable and human-readable breadcrumbs
-// agree. `item` is omitted on the last crumb per Google's guidance (the current
-// page shouldn't link to itself in the trail). Additive, zero-risk
-// discovery-enrichment sibling of the Organization `founder` / WebSite
-// `inLanguage` additions, applied to the 44+ post surface the sitemap already
-// ships to search engines.
+// agree. Additive, zero-risk discovery-enrichment sibling of the Organization
+// `founder` / WebSite `inLanguage` additions, applied to the 44+ post surface
+// the sitemap already ships to search engines.
 export function breadcrumbJsonLd(postTitle: string) {
-  const siteUrl = getSiteUrl();
+  return breadcrumbListJsonLd([
+    { name: 'Blog', path: '/blog' },
+    { name: postTitle },
+  ]);
+}
+
+// FAQPage node for `/write`.
+//
+// History worth keeping straight: an earlier revision *removed* an FAQPage
+// block from this page because Google requires the Q&A to be visible on the
+// page for the FAQ rich result, and deprecated that result for non-government/
+// health sites in Aug 2023. It was re-introduced for answer-engine
+// optimization, which is a genuinely different consumer — LLM-backed search
+// reads FAQPage regardless of Google's rich-result policy. Both things are
+// true, so the block stays, but with the tradeoff recorded rather than a stale
+// comment claiming it was dropped: this markup earns nothing from Google and
+// carries a (small) structured-data-policy risk there, and the answers below
+// must therefore stay factually true of the shipped product, since nothing on
+// `/write` renders them for a human to check.
+const WRITE_FAQ: { question: string; answer: string }[] = [
+  {
+    question: 'How does By My Own Hand prove writing is human?',
+    answer:
+      'By My Own Hand records keystroke-level writing activity in real time, capturing the natural rhythm, edits, and pauses of human composition. This produces a verifiable authorship record that demonstrates the text was typed by a person rather than generated or pasted by AI.',
+  },
+  {
+    question: 'Does By My Own Hand block AI-generated text?',
+    answer:
+      'The writing environment blocks external pasting and drag-and-drop, so every character must be typed in the editor. Blocked paste attempts are counted and shown on the verification page, and the keystroke trace can be replayed to see the document being composed.',
+  },
+  {
+    question: 'What does the authenticity certificate include?',
+    answer:
+      'The certificate includes the document title, word count, writing duration, the integrity score derived from your keystroke metrics, and a verification hash linking to a replayable record of the writing session.',
+  },
+  {
+    question: 'Who uses By My Own Hand?',
+    answer:
+      'Students, educators, journalists, and professionals use By My Own Hand to certify that essays, articles, and applications were written by a human, providing trustworthy proof of authenticity in an era of AI-generated text.',
+  },
+];
+
+export function faqPageJsonLd() {
   return {
     '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      {
-        '@type': 'ListItem',
-        position: 1,
-        name: 'Blog',
-        item: `${siteUrl}/blog`,
-      },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        name: postTitle,
-      },
-    ],
+    '@type': 'FAQPage',
+    mainEntity: WRITE_FAQ.map(({ question, answer }) => ({
+      '@type': 'Question',
+      name: question,
+      acceptedAnswer: { '@type': 'Answer', text: answer },
+    })),
   };
 }
 

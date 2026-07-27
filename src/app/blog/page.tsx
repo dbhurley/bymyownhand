@@ -128,7 +128,7 @@ export default function BlogPage() {
                   </div>
                 </div>
                 <div className="hidden md:flex items-center justify-center w-16 h-16 rounded-full border border-cream/20 flex-shrink-0 group-hover:border-accent/50 transition-colors">
-                  <svg width="24" height="24" fill="none" viewBox="0 0 24 24" className="text-cream/60 group-hover:text-accent transition-colors">
+                  <svg width="24" height="24" fill="none" viewBox="0 0 24 24" className="text-cream/60 group-hover:text-accent transition-colors" aria-hidden="true">
                     <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </div>
@@ -198,7 +198,7 @@ export default function BlogPage() {
                       </p>
                       <div className="flex items-center gap-1 mt-3 text-sm text-accent font-medium opacity-0 group-hover:opacity-100 transition-opacity">
                         <span>Read more</span>
-                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" className="group-hover:translate-x-1 transition-transform">
+                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" className="group-hover:translate-x-1 transition-transform" aria-hidden="true">
                           <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </div>
@@ -266,7 +266,7 @@ export default function BlogPage() {
                 className="inline-flex items-center gap-2 px-5 py-2.5 bg-cream text-deep-blue text-sm font-semibold rounded-full hover:bg-white transition-colors"
               >
                 Start Writing
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </Link>
