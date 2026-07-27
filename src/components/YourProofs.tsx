@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useSyncExternalStore } from 'react';
+import { useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
-import { getRecentCertifications, type CertificationRecord } from '@/lib/history';
+import { getRecentCertifications, getStreakSummary, type CertificationRecord } from '@/lib/history';
 import { getScoreLabel } from '@/lib/metrics';
 
 // A returning writer's own certified pieces, recalled from the local-first
@@ -24,7 +24,24 @@ import { getScoreLabel } from '@/lib/metrics';
 // the list appears only after the mount effect reads localStorage, so there is
 // nothing to hydrate-mismatch. Migrates with the rest of `history.ts` to the
 // `/u/<handle>` portfolio when accounts land in Phase 1.2.
-const RECALL_LIMIT = 3;
+//
+// The collapsed list shows the three newest pieces so the marketing page stays
+// a marketing page. But three was also the *only* number a returning writer
+// could ever reach: `/success/<hash>` (which lists five and notes "showing N of
+// M") is reachable only in the session that certified the piece, so for a writer
+// with a dozen proofs the other nine had no path at all — the same "the work
+// survives, the path to it doesn't" hole the recall list exists to close, just
+// moved one step further out. Expanding in place reaches the rest without
+// spending a new route or a hydration-sensitive surface on it, and the whole
+// section still disappears on a device with no history.
+const COLLAPSED_LIMIT = 3;
+
+// A ceiling on what the expanded list renders. `lib/history.ts` keeps up to 500
+// records; rendering all of them onto the landing page would be a wall, and the
+// portfolio view that genuinely wants pagination is the Phase 1.2 `/u/<handle>`
+// page. Anything beyond this is reported in the count rather than silently
+// dropped.
+const EXPANDED_LIMIT = 25;
 
 // `localStorage` is an external store, so read it with `useSyncExternalStore`
 // rather than the read-in-an-effect-then-setState pattern: React renders the
@@ -35,18 +52,37 @@ const RECALL_LIMIT = 3;
 // each call — so it is memoized per mount in a ref. Nothing mutates the history
 // while this page is open (certification happens on `/write` → `/success`), so
 // there is no change to subscribe to.
-const EMPTY_SNAPSHOT: CertificationRecord[] = [];
+interface ProofsSnapshot {
+  proofs: CertificationRecord[];
+  total: number;
+}
+
+const EMPTY_SNAPSHOT: ProofsSnapshot = { proofs: [], total: 0 };
 const noopSubscribe = () => () => {};
 
 export function YourProofs() {
-  const snapshot = useRef<CertificationRecord[] | null>(null);
-  const proofs = useSyncExternalStore(
+  const snapshot = useRef<ProofsSnapshot | null>(null);
+  const [expanded, setExpanded] = useState(false);
+
+  // Read the expandable set once, then slice per render — expanding is a view
+  // change, not a new read, so the store snapshot stays referentially stable.
+  const { proofs, total } = useSyncExternalStore(
     noopSubscribe,
-    () => (snapshot.current ??= getRecentCertifications(RECALL_LIMIT)),
+    () =>
+      (snapshot.current ??= {
+        proofs: getRecentCertifications(EXPANDED_LIMIT),
+        total: getStreakSummary().total,
+      }),
     () => EMPTY_SNAPSHOT
   );
 
   if (proofs.length === 0) return null;
+
+  const visible = expanded ? proofs : proofs.slice(0, COLLAPSED_LIMIT);
+  // Records past EXPANDED_LIMIT — unreachable from this list even when it is
+  // fully expanded, so they are the only ones worth calling out. Collapsed
+  // pieces are already accounted for by the "Show all N" button.
+  const beyondLimit = total - proofs.length;
 
   return (
     <>
@@ -62,7 +98,7 @@ export function YourProofs() {
         </h2>
 
         <ul className="max-w-xl mx-auto bg-white rounded-2xl border border-deep-blue/[0.06] overflow-hidden divide-y divide-deep-blue/[0.04]">
-          {proofs.map(proof => (
+          {visible.map(proof => (
             <li key={proof.hash}>
               <Link
                 href={`/verify/${proof.hash}`}
@@ -92,7 +128,26 @@ export function YourProofs() {
           ))}
         </ul>
 
+        {/* Only offer the toggle when it would actually reveal something. Once
+            expanded it becomes "Show fewer", so the writer can always get the
+            landing page back to its calm default. */}
+        {proofs.length > COLLAPSED_LIMIT && (
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => setExpanded(v => !v)}
+              aria-expanded={expanded}
+              className="text-xs font-medium text-deep-blue/50 hover:text-deep-blue transition-colors underline underline-offset-4 decoration-deep-blue/20"
+            >
+              {expanded ? 'Show fewer' : `Show all ${proofs.length}`}
+            </button>
+          </div>
+        )}
+
         <p className="text-xs text-deep-blue/35 mt-4 text-center">
+          {/* Report anything past EXPANDED_LIMIT rather than silently dropping
+              it, so the count a writer sees always matches what is on the
+              device. */}
+          {beyondLimit > 0 && `${beyondLimit} older piece${beyondLimit === 1 ? '' : 's'} not shown · `}
           Kept on this device only — no account needed, nothing uploaded.
         </p>
       </section>

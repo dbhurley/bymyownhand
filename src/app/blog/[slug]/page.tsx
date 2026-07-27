@@ -263,7 +263,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
                 className="inline-flex items-center gap-2 px-8 py-3 bg-cream text-deep-blue font-semibold rounded-full hover:bg-white transition-colors"
               >
                 Start Writing
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </Link>

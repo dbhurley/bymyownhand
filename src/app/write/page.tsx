@@ -8,7 +8,14 @@ import type { WritingSession } from '@/lib/types';
 import { clearDraft, formatDraftAge, loadDraft, type DraftSnapshot } from '@/lib/draft';
 import { countWords } from '@/lib/metrics';
 import { getStreakSummary, type StreakSummary } from '@/lib/history';
-import { organizationJsonLd, websiteJsonLd } from '@/lib/structuredData';
+import {
+  breadcrumbListJsonLd,
+  faqPageJsonLd,
+  organizationJsonLd,
+  webApplicationJsonLd,
+  websiteJsonLd,
+} from '@/lib/structuredData';
+import { getSiteUrl } from '@/lib/site';
 
 // Dynamic import for Monaco to avoid SSR issues
 const LockedEditor = dynamic(() => import('@/components/LockedEditor'), {
@@ -154,14 +161,17 @@ export default function WritePage() {
       {/* JSON-LD structured data. URLs resolve through getSiteUrl() so
           staging/local-preview pages emit their own canonical instead of
           hard-coding production. The SearchAction was dropped (§6.16) because
-          this site has no /?s=... search route. The FAQPage block was dropped
-          too: Google's FAQ schema requires the Q&A content to be visible to
-          users on the page at the same URL, but `/write` is just the locked
-          editor — the questions and answers were never rendered anywhere on
-          this surface. Google also deprecated FAQ rich results in Aug 2023
-          (only government/health sites still get them), so the block was
-          carrying real schema-policy risk for zero SEO upside. Same honesty
-          principle as the prior "no fabricated evidence" series. */}
+          this site has no /?s=... search route.
+
+          The app / FAQ / breadcrumb nodes below were added inline with
+          hard-coded `https://bymyownhand.com/...` URLs, so a staging or preview
+          deployment advertised production's URLs, and the app node was a second
+          hand-rolled description of the product competing with the homepage's
+          `webApplicationJsonLd()` entity. All three now come from the shared
+          `lib/structuredData.ts` helpers, resolve through getSiteUrl(), and the
+          app node reuses the one stable `@id` so both surfaces describe a single
+          entity. See `faqPageJsonLd()` for why the FAQ block stays despite the
+          earlier decision to drop it. */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }}
@@ -169,6 +179,22 @@ export default function WritePage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd()) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webApplicationJsonLd(`${getSiteUrl()}/write`)) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqPageJsonLd()) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(
+            breadcrumbListJsonLd([{ name: 'Home', path: '/' }, { name: 'Write' }])
+          ),
+        }}
       />
 
       {/* Editor. A <main> landmark rather than a bare <div>: the editor is the
@@ -192,21 +218,6 @@ export default function WritePage() {
             isSubmitting={isSubmitting}
           />
         ) : null}
-      
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: `{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How does By My Own Hand prove writing is human?","acceptedAnswer":{"@type":"Answer","text":"By My Own Hand records keystroke-level writing activity in real time, capturing the natural rhythm, edits, and pauses of human composition. This produces a verifiable authorship record that demonstrates the text was typed by a person rather than generated or pasted by AI."}},{"@type":"Question","name":"Does By My Own Hand block AI-generated text?","acceptedAnswer":{"@type":"Answer","text":"Yes. The writing environment blocks pasting and AI-assisted insertion, so every character must be typed by hand. This ensures the resulting certificate reflects genuine human authorship."}},{"@type":"Question","name":"What does the authenticity certificate include?","acceptedAnswer":{"@type":"Answer","text":"The certificate includes a timestamped keystroke record, the total writing duration, and a verifiable proof that the document was composed manually without AI assistance or pasted content."}},{"@type":"Question","name":"Who uses By My Own Hand?","acceptedAnswer":{"@type":"Answer","text":"Students, educators, journalists, and professionals use By My Own Hand to certify that essays, articles, and applications were written by a human, providing trustworthy proof of authenticity in an era of AI-generated text."}}]}` }}
-      />
-      
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: `{"@context":"https://schema.org","@type":"SoftwareApplication","name":"By My Own Hand","url":"https://bymyownhand.com/write","applicationCategory":"ProductivityApplication","operatingSystem":"Web","description":"A writing tool that captures keystrokes and blocks AI to certify that text was created by a human, producing a verifiable authenticity certificate.","featureList":["Real-time keystroke capture","AI and paste blocking","Timestamped authorship certificate","Human-authorship verification"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}` }}
-      />
-      
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: `{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://bymyownhand.com/"},{"@type":"ListItem","position":2,"name":"Write","item":"https://bymyownhand.com/write"}]}` }}
-      />
       </main>
     </div>
   );
