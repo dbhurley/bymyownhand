@@ -25,6 +25,51 @@ export function splitWords(content: string): string[] {
   return trimmed.split(/\s+/).filter(Boolean);
 }
 
+const KEYSTROKE_EVENT_TYPES = new Set<KeystrokeEvent['type']>([
+  'key',
+  'delete',
+  'paste_blocked',
+  'paste_internal',
+]);
+
+// Single source of truth for what a well-formed KeystrokeEvent looks like,
+// enforced at the `POST /api/documents` write boundary. The route already
+// checked that `session.events` is a non-empty array under the 250k cap, but
+// never what was *in* it — so the two failure modes below both reached the
+// canonical record:
+//
+//   - `events: [null]` threw a TypeError on `e.type` inside `calculateMetrics()`
+//     and landed in the route's outer catch as `500 Failed to create document`:
+//     a server-error status (and a `console.error`) for what is squarely a
+//     client error. Same mis-typed-status bug the prior revision fixed for
+//     `title: 123`, one field further in.
+//   - `events: [{ t: 'abc', … }]` was accepted outright. Every interval derived
+//     from it is NaN, so the persisted `keystroke_data.metrics` stores nulls
+//     (JSON has no NaN) and `/verify/<hash>` — which recomputes from the trace
+//     at read time — renders "NaN" in the writing-analysis panel of a document
+//     it is presenting as certified proof.
+//
+// `t` and `type` drive all the timing math and the event classification; `len`
+// additionally advances the playback cursor on `/verify` (`event.len ?? 1`), so
+// a non-finite one desyncs the replay from the certified content. `pos` is
+// recorded but never read by any computation, so it is checked for type without
+// a range constraint. `t` is deliberately *not* required to be non-negative: a
+// clock corrected backwards mid-session can legitimately produce one, and
+// failing a real writer's certification over it would be worse than the skewed
+// interval it causes. Same trust-boundary shape as `isValidRecord()` in
+// `lib/history.ts` and the strict draft-snapshot check in `lib/draft.ts`.
+export function isValidKeystrokeEvent(value: unknown): value is KeystrokeEvent {
+  if (!value || typeof value !== 'object') return false;
+  const e = value as Record<string, unknown>;
+  return (
+    Number.isFinite(e.t) &&
+    KEYSTROKE_EVENT_TYPES.has(e.type as KeystrokeEvent['type']) &&
+    Number.isFinite(e.pos) &&
+    (e.key === undefined || typeof e.key === 'string') &&
+    (e.len === undefined || (Number.isFinite(e.len) && (e.len as number) >= 0))
+  );
+}
+
 export function calculateMetrics(events: KeystrokeEvent[], content = ''): WritingMetrics {
   // Classify the trace in a single pass rather than three separate `.filter()`
   // sweeps. The trace can be large (up to the 250k-event server cap), so walking

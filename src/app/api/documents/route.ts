@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid';
 import { generateVerificationHash } from '@/lib/hash';
 import { createDocument } from '@/lib/db';
 import { getCanonicalVerifyUrl } from '@/lib/site';
-import { countWords, calculateMetrics, getSessionWritingTime } from '@/lib/metrics';
+import { countWords, calculateMetrics, getSessionWritingTime, isValidKeystrokeEvent } from '@/lib/metrics';
 import type { WritingSession } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
@@ -101,6 +101,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: `Keystroke trace exceeds maximum allowed size (${MAX_TRACE_EVENTS} events)` },
         { status: 413 }
+      );
+    }
+
+    // Validate the *shape* of each event, not just the array's type and size.
+    // The two checks above admitted any array under the cap, so a trace of
+    // `[null]` threw a TypeError inside `calculateMetrics()` and surfaced as a
+    // `500 Failed to create document` (a server-error status for a client
+    // error, indistinguishable in the logs from the service actually breaking),
+    // and a trace of `[{ t: 'abc', type: 'key' }, …]` was accepted outright —
+    // persisting NaN-derived metrics into `keystroke_data` and rendering "NaN"
+    // in the writing-analysis panel on the public `/verify/<hash>` proof page.
+    // Both verified against the running build before this gate.
+    //
+    // Runs after the O(1) size cap so a rejected multi-million-event payload is
+    // never walked, and before `countWords()` for the same O(1)-before-O(n)
+    // ordering rationale as the gates above. The scan is O(events) on input
+    // already bounded to 250k, which is the same order `calculateMetrics()`
+    // spends on it a few lines later. Trust-boundary sibling of the server-side
+    // wordCount / title / writingTimeMs / trace-size gates — the server is
+    // canonical for what it admits, and this contract is what Phase 2.1 exposes
+    // to partners who aren't our own web client.
+    if (!session.events.every(isValidKeystrokeEvent)) {
+      return NextResponse.json(
+        { error: 'Keystroke trace contains a malformed event' },
+        { status: 400 }
       );
     }
 
