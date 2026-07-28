@@ -217,6 +217,38 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
       }
     });
 
+    // Block every *other* route from the system clipboard into the editor.
+    // The onKeyDown handler above intercepts Cmd/Ctrl+V, but that is only one
+    // of the ways a paste actually happens: a long-press → Paste on mobile
+    // (where most of the traffic is, and where there is no Cmd+V at all),
+    // Shift+Insert on Windows/Linux, middle-click paste on X11, and the
+    // browser's own Edit ▸ Paste menu each produce a native `paste` event with
+    // no Cmd/Ctrl+V keydown for us to preventDefault. Verified against the
+    // running editor: a `paste` event dispatched at the editor reached no
+    // application handler at all — the React `onPaste` on the overlay below is
+    // dead code for this, since the overlay is a sibling of Monaco's input
+    // element rather than an ancestor of it. So whether those routes inserted
+    // text was left entirely to Monaco's internals, and either way the attempt
+    // left no record: no `paste_blocked` event in the certified trace, no
+    // counter, no notice to the writer.
+    //
+    // Blocking external paste is the product's core promise, so it is guarded
+    // at the application layer where the outcome is ours, and every attempt is
+    // recorded exactly the way the keyboard path records it. Capture phase, so
+    // it runs before Monaco's own paste handling. The *allowed* intra-editor
+    // paste path is unaffected: it is applied through `executeEdits()` above
+    // and never produces a clipboard event.
+    editor.getDomNode()?.addEventListener('paste', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setBlockedPasteCount(prev => prev + 1);
+      flashPasteBlocked();
+      recordEvent({
+        type: 'paste_blocked',
+        pos: editor.getPosition()?.column || 0,
+      });
+    }, true);
+
     // Block drag-and-drop
     editor.getDomNode()?.addEventListener('drop', (e) => {
       e.preventDefault();
@@ -297,11 +329,35 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
       }
     };
 
+    // `beforeunload` is the classic last-chance-to-save hook, but it is the one
+    // the mobile browsers don't guarantee: iOS Safari in particular does not
+    // fire it when a tab is backgrounded, when the app is switched away from,
+    // or when the page is discarded under memory pressure — the page goes
+    // straight to `pagehide`/`visibilityState === 'hidden'`. So on the devices
+    // that make up most of the traffic, the only save that ever ran was the 3s
+    // interval — and background tabs throttle timers aggressively, so even that
+    // stops once the writer switches apps. Everything typed since the last tick
+    // was simply lost. That is exactly the event Phase 1.1 exists to prevent
+    // ("an accidental tab-close erases work — that single event kills
+    // retention"), and it was going unhandled on the majority platform.
+    //
+    // `pagehide` and `visibilitychange` → hidden are what the platform actually
+    // guarantees here. `persist()` writes the same snapshot every time and is
+    // idempotent, so listening on all three costs nothing but a redundant
+    // `setItem` on the desktop path.
+    const persistOnHide = () => {
+      if (window.document.visibilityState === 'hidden') persist();
+    };
+
     const interval = window.setInterval(persist, 3000);
     window.addEventListener('beforeunload', persist);
+    window.addEventListener('pagehide', persist);
+    window.document.addEventListener('visibilitychange', persistOnHide);
     return () => {
       window.clearInterval(interval);
       window.removeEventListener('beforeunload', persist);
+      window.removeEventListener('pagehide', persist);
+      window.document.removeEventListener('visibilitychange', persistOnHide);
     };
   }, [sessionId, startedAt]);
 
