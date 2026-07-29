@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { organizationJsonLd, websiteJsonLd, webApplicationJsonLd } from '@/lib/structuredData';
 import { YourProofs } from '@/components/YourProofs';
+import { UnfinishedDraft } from '@/components/UnfinishedDraft';
 
 export default function Home() {
   return (
@@ -71,6 +72,15 @@ export default function Home() {
           </Link>
         </div>
       </section>
+
+      {/* A returning writer's unfinished draft, ahead of their finished proofs:
+          the piece they are in the middle of is the more urgent recall, and the
+          only surface that previously announced a saved draft was /write itself.
+          Renders nothing when no draft exists — see components/UnfinishedDraft.tsx.
+          Carries no divider of its own, so the divider YourProofs renders falls
+          between the two when both are present and the page's existing rhythm is
+          unchanged in every other combination. */}
+      <UnfinishedDraft />
 
       {/* A returning writer's own certified pieces, recalled from the local-first
           history. Renders nothing (not even its divider) on a device with no

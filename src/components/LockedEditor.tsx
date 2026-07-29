@@ -96,6 +96,41 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
   const handleEditorMount: OnMount = (editor) => {
     editorRef.current = editor;
 
+    // Remember the current selection as the editor's own clipboard, so a later
+    // Cmd+V of the writer's own text is recognised as an internal paste rather
+    // than counted as a blocked external one. Returns the selection so the cut
+    // path can record what it removed.
+    const syncInternalClipboard = (): { text: string; pos: number } => {
+      const selection = editor.getSelection();
+      if (!selection || selection.isEmpty()) return { text: '', pos: 0 };
+      const text = editor.getModel()?.getValueInRange(selection) ?? '';
+      if (text) internalClipboard.current = text;
+      return { text, pos: selection.startColumn };
+    };
+
+    // A cut removes text from the document, so it is recorded as the deletion
+    // it is — carrying `len`, the way `paste_internal` carries the length it
+    // inserts, because a cut takes out a whole selection rather than one
+    // character. Reachable from two places (the Cmd/Ctrl+X keydown and the DOM
+    // `cut` event, which different platforms deliver differently), so it
+    // collapses calls landing within the same action into a single event rather
+    // than double-counting the deletion when both fire. The duplicate is matched
+    // on the cut text *and* a short window, not on time alone: both hooks run
+    // before Monaco applies the removal, so a duplicate is always the identical
+    // selection, and two genuinely separate cuts of the same text within 250ms
+    // would need the writer to reselect it in a window the removal has just
+    // made impossible.
+    const lastCut = { text: '', at: -1 };
+    const recordCut = () => {
+      const { text, pos } = syncInternalClipboard();
+      if (!text) return;
+      const now = Date.now();
+      if (text === lastCut.text && now - lastCut.at < 250) return;
+      lastCut.text = text;
+      lastCut.at = now;
+      recordEvent({ type: 'delete', key: 'Cut', pos, len: text.length });
+    };
+
     // Block external paste - intercept clipboard
     editor.onKeyDown((e) => {
       // Handle paste attempt (Cmd+V / Ctrl+V)
@@ -130,25 +165,27 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
         return;
       }
 
-      // Handle copy (Cmd+C / Ctrl+C) - store in internal clipboard
+      // Handle copy (Cmd+C / Ctrl+C) — store in internal clipboard so an
+      // intra-editor paste of the writer's own text is recognised as internal.
+      // Allow default copy behavior for accessibility.
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyC') {
-        const selection = editor.getSelection();
-        if (selection) {
-          const selectedText = editor.getModel()?.getValueInRange(selection) || '';
-          internalClipboard.current = selectedText;
-        }
-        // Allow default copy behavior for accessibility
+        syncInternalClipboard();
         return;
       }
 
-      // Handle cut (Cmd+X / Ctrl+X)
+      // Handle cut (Cmd+X / Ctrl+X). Allow the default cut, but *record the
+      // deletion it performs*. Previously this branch stored the clipboard and
+      // returned, and the keyup handler's meta/ctrl guard then skipped the
+      // keyup — so no path recorded anything, and a cut removed text from the
+      // document while the certified trace gained zero events. Verified in a
+      // browser before this fix: cutting a 16-character selection took the
+      // content from 63 chars to 47 with an empty trace. That is a hole in the
+      // core claim — the trace stops accounting for the document it is proof of
+      // — and it also under-reports `deletionRate`, which the integrity score
+      // reads, and leaves the Phase 3.4 "does the content reconstruct from the
+      // trace?" check nothing to reconstruct from.
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyX') {
-        const selection = editor.getSelection();
-        if (selection) {
-          const selectedText = editor.getModel()?.getValueInRange(selection) || '';
-          internalClipboard.current = selectedText;
-        }
-        // Allow default cut behavior
+        recordCut();
         return;
       }
     });
@@ -247,6 +284,24 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
         type: 'paste_blocked',
         pos: editor.getPosition()?.column || 0,
       });
+    }, true);
+
+    // The same routes the `paste` listener above exists to cover — a long-press
+    // → Copy/Cut on mobile, the browser's Edit ▸ Copy/Cut menu, Shift+Delete —
+    // reach copy and cut without any Cmd/Ctrl keydown for the handler above to
+    // see, so those verbs get a DOM-level listener too. `recordCut()` is
+    // idempotent within one action, so a route that fires *both* a keydown and
+    // a native `cut` event still records the deletion exactly once.
+    //
+    // Not prevented: cut and copy are allowed operations — the lockdown is about
+    // what comes *in* from the system clipboard, not what the writer does with
+    // their own text — and Monaco performs the removal and clipboard write.
+    editor.getDomNode()?.addEventListener('copy', () => {
+      syncInternalClipboard();
+    }, true);
+
+    editor.getDomNode()?.addEventListener('cut', () => {
+      recordCut();
     }, true);
 
     // Block drag-and-drop

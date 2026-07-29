@@ -1,9 +1,8 @@
 'use client';
 
 import { useRef, useState, useSyncExternalStore } from 'react';
-import Link from 'next/link';
 import { getRecentCertifications, getStreakSummary, type CertificationRecord } from '@/lib/history';
-import { getScoreLabel } from '@/lib/metrics';
+import { ProofList } from '@/components/ProofList';
 
 // A returning writer's own certified pieces, recalled from the local-first
 // `lib/history.ts` record — Phase 1.4/1.2 staged rollout, rendered on the
@@ -97,36 +96,12 @@ export function YourProofs() {
           Your proofs
         </h2>
 
-        <ul className="max-w-xl mx-auto bg-white rounded-2xl border border-deep-blue/[0.06] overflow-hidden divide-y divide-deep-blue/[0.04]">
-          {visible.map(proof => (
-            <li key={proof.hash}>
-              <Link
-                href={`/verify/${proof.hash}`}
-                className="flex items-center justify-between gap-4 px-5 md:px-6 py-3.5 hover:bg-deep-blue/[0.02] transition-colors"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm text-deep-blue/75 truncate">
-                    {/* Records written before titles were kept fall back to the
-                        hash, which is still a meaningful handle. */}
-                    {proof.title || proof.hash}
-                  </span>
-                  <span className="block text-xs text-deep-blue/35 mt-0.5">
-                    {new Date(proof.certifiedAt).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                    {' · '}
-                    {proof.wordCount} word{proof.wordCount === 1 ? '' : 's'}
-                  </span>
-                </span>
-                <span className={`text-sm font-semibold flex-shrink-0 tabular-nums ${getScoreLabel(proof.integrityScore).color}`}>
-                  {proof.integrityScore}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        {/* The list itself is the shared `ProofList` — the same rows the
+            `/success/<hash>` recall list renders. The landing page's narrower
+            column is applied by the wrapper, not by a second copy of the card. */}
+        <div className="max-w-xl mx-auto">
+          <ProofList proofs={visible} />
+        </div>
 
         {/* Only offer the toggle when it would actually reveal something. Once
             expanded it becomes "Show fewer", so the writer can always get the
