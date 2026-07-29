@@ -147,7 +147,14 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
       const event = keyEvents[currentIndex];
 
       if (event.type === 'delete') {
-        forwardCount = Math.max(0, forwardCount - 1);
+        // Honor `len` the same way `paste_internal` does below. Most deletes
+        // are a single Backspace/Delete and carry no `len`, so `?? 1` keeps
+        // every existing trace replaying exactly as before — but a cut removes
+        // a whole selection at once and records the length it took out. Without
+        // this, a 16-character cut rewound the playback cursor by 1 and left
+        // the replay 15 characters ahead of the document for the rest of the
+        // session.
+        forwardCount = Math.max(0, forwardCount - (event.len ?? 1));
       } else if (event.type === 'paste_internal') {
         forwardCount = Math.min(content.length, forwardCount + (event.len ?? 1));
       } else {
