@@ -2,7 +2,7 @@
 
 import { useRef, useSyncExternalStore } from 'react';
 import Link from 'next/link';
-import { formatDraftAge, loadDraft } from '@/lib/draft';
+import { formatDraftAge, formatDraftExpiry, loadDraft } from '@/lib/draft';
 import { countWords } from '@/lib/metrics';
 
 // A returning writer's *unfinished* piece, recalled on the landing page.
@@ -67,6 +67,8 @@ export function UnfinishedDraft() {
   // resume *to* — announcing "0 words" would be noise, not recall.
   if (!draft || draft.wordCount === 0) return null;
 
+  const expiry = formatDraftExpiry(draft.savedAt);
+
   return (
     <section className="max-w-3xl mx-auto px-6 pt-4 pb-8">
       <Link
@@ -82,6 +84,13 @@ export function UnfinishedDraft() {
           </span>
           <span className="block text-xs text-deep-blue/35 mt-0.5">
             {draft.wordCount} word{draft.wordCount === 1 ? '' : 's'} · saved {formatDraftAge(draft.savedAt)}
+            {/* The draft has a 24h window that was previously enforced in
+                silence — see formatDraftExpiry(). Announcing what is left is
+                what turns this card from a record into a reason to come back
+                now. Omitted rather than shown as "expired": a draft past the
+                window is already gone by the time this renders, since
+                loadDraft() prunes it. */}
+            {expiry && <> · {expiry}</>}
           </span>
         </span>
         <span className="flex items-center gap-2 flex-shrink-0 text-sm font-medium text-deep-blue">

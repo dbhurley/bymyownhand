@@ -254,6 +254,51 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
       }
     });
 
+    // Undo and redo are the last routes that changed the document without
+    // leaving a record. `Cmd/Ctrl+Z` (and `Cmd+Shift+Z` / `Ctrl+Y`) reach
+    // Monaco's own undo stack directly: the keyup handler above deliberately
+    // skips command combos so they don't land in the trace as phantom
+    // keystrokes, and no other path saw them — so an undo removed text, or a
+    // redo put it back, and the certified trace gained nothing. Verified before
+    // this fix: an undo took the content from 71 characters to 65 and a redo
+    // returned it to 71, while the trace stayed at zero events across both.
+    //
+    // Same hole the cut fix closed, and the same reason it matters: the trace is
+    // meant to be the canonical account of how the document came to be, and a
+    // writer who drafts a sentence, undoes it, and rewrites it did real editing
+    // work that `deletionRate` (which the integrity score reads) never saw. It
+    // is also the remaining blocker on the Phase 3.4 "does the content
+    // reconstruct from the trace?" check, which can only be enforced once every
+    // mutation of the buffer is accounted for.
+    //
+    // Hooked on the model-change event rather than the keystrokes, because
+    // that is where the actual mutation and its true size are: one undo step can
+    // span several ranges, and its size has no relation to how many keys were
+    // pressed. `isUndoing`/`isRedoing` scope the listener to exactly those two
+    // verbs — every other edit (typing, the allowed internal paste, a cut) is
+    // already recorded by its own handler and skipped here, so nothing is
+    // double-counted. A step that both removes and inserts (undoing a paste that
+    // replaced a selection) records both halves, since the buffer did both.
+    //
+    // No new event type: a removal is the `delete` it already is and a
+    // re-insertion is the same bulk insert of the writer's own text that
+    // `paste_internal` describes, both carrying `len`. So the trace schema, the
+    // API's shape validation, and the `/verify` playback (which already honors
+    // `len` on both) are unchanged, and `key` records which verb it was.
+    editor.onDidChangeModelContent((e) => {
+      if (!e.isUndoing && !e.isRedoing) return;
+      const key = e.isUndoing ? 'Undo' : 'Redo';
+      for (const change of e.changes) {
+        const pos = change.range.startColumn;
+        if (change.rangeLength > 0) {
+          recordEvent({ type: 'delete', key, pos, len: change.rangeLength });
+        }
+        if (change.text.length > 0) {
+          recordEvent({ type: 'paste_internal', key, pos, len: change.text.length });
+        }
+      }
+    });
+
     // Block every *other* route from the system clipboard into the editor.
     // The onKeyDown handler above intercepts Cmd/Ctrl+V, but that is only one
     // of the ways a paste actually happens: a long-press → Paste on mobile
