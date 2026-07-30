@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import type { WritingSession } from '@/lib/types';
-import { clearDraft, formatDraftAge, loadDraft, type DraftSnapshot } from '@/lib/draft';
+import { clearDraft, formatDraftAge, formatDraftExpiry, loadDraft, type DraftSnapshot } from '@/lib/draft';
 import { countWords } from '@/lib/metrics';
 import { getStreakSummary, type StreakSummary } from '@/lib/history';
 import {
@@ -52,6 +52,22 @@ export default function WritePage() {
     if (existing) {
       setDraft(existing);
       setTitle(existing.title);
+      // The resume banner is an interstitial that gates the editor to ask a
+      // question — "do you want your earlier work back?" — and that question
+      // only means anything when there *is* earlier work. The autosave persists
+      // a snapshot as soon as the writer has a title *or* content, so someone
+      // who typed a title and left came back to a full-screen card offering to
+      // resume a draft of zero words, and had to answer it before they could
+      // write anything. Friction, on the one surface the entire product exists
+      // to get people onto — and inconsistent with the landing-page recall card,
+      // which already declines to announce a wordless draft as something to
+      // return to.
+      //
+      // Resumed silently rather than discarded: the title carries over as it
+      // always did, and a wordless draft can still hold a real keystroke trace
+      // (a writer who typed a paragraph and deleted all of it), which resuming
+      // keeps continuous exactly as the banner's Resume button would.
+      setDecision(countWords(existing.content) === 0 ? 'resume' : 'pending');
     } else {
       setDecision('fresh');
     }
@@ -233,6 +249,9 @@ function ResumeBanner({
   onDiscard: () => void;
 }) {
   const wordCount = countWords(draft.content);
+  // The 24h window was enforced silently — see formatDraftExpiry(). A writer
+  // deciding whether to resume should know how long the choice stays open.
+  const expiry = formatDraftExpiry(draft.savedAt);
   return (
     <div className="h-full flex items-center justify-center px-6 bg-cream">
       <div className="max-w-md w-full bg-white rounded-2xl border border-deep-blue/[0.08] p-6 md:p-8 shadow-sm">
@@ -244,7 +263,8 @@ function ResumeBanner({
         </h2>
         <p className="text-deep-blue/50 mb-6 leading-relaxed">
           We saved <span className="font-semibold text-deep-blue/70">{draft.title || 'an untitled draft'}</span>
-          {' '}({wordCount} word{wordCount === 1 ? '' : 's'}, {formatDraftAge(draft.savedAt)}).
+          {' '}({wordCount} word{wordCount === 1 ? '' : 's'}, {formatDraftAge(draft.savedAt)}
+          {expiry ? `, ${expiry}` : ''}).
           Resuming preserves your full keystroke trace.
         </p>
         <div className="flex flex-col sm:flex-row gap-3">
