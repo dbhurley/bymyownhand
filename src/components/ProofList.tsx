@@ -21,7 +21,9 @@ import { getScoreLabel } from '@/lib/metrics';
 export function ProofList({ proofs }: { proofs: CertificationRecord[] }) {
   return (
     <ul className="bg-white rounded-2xl border border-deep-blue/[0.06] overflow-hidden divide-y divide-deep-blue/[0.04]">
-      {proofs.map(proof => (
+      {proofs.map(proof => {
+        const score = getScoreLabel(proof.integrityScore);
+        return (
         <li key={proof.hash}>
           <Link
             href={`/verify/${proof.hash}`}
@@ -43,12 +45,25 @@ export function ProofList({ proofs }: { proofs: CertificationRecord[] }) {
                 {proof.wordCount} word{proof.wordCount === 1 ? '' : 's'}
               </span>
             </span>
-            <span className={`text-sm font-semibold flex-shrink-0 tabular-nums ${getScoreLabel(proof.integrityScore).color}`}>
+            {/* The row is a single link, so its accessible name is the
+                concatenation of everything inside it — and it used to end in a
+                bare number ("Essay draft, Jul 30, 2026, 412 words, 92"), which
+                tells a screen-reader user nothing about what the 92 is. The
+                figure is also the one value in the row whose *meaning* is
+                carried visually by colour alone; the `getScoreLabel()` word
+                behind that colour ("Excellent", "Good") is already shown as
+                text beside the score on `/success` and `/verify`, and was the
+                only thing missing here. Both are supplied to assistive tech
+                without changing the calm numeral a sighted reader sees. */}
+            <span className={`text-sm font-semibold flex-shrink-0 tabular-nums ${score.color}`}>
+              <span className="sr-only">Integrity score </span>
               {proof.integrityScore}
+              <span className="sr-only"> out of 100, {score.label}</span>
             </span>
           </Link>
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }
