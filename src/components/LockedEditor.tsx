@@ -108,6 +108,43 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
       return { text, pos: selection.startColumn };
     };
 
+    const selectionLength = (): number => {
+      const selection = editor.getSelection();
+      if (!selection || selection.isEmpty()) return 0;
+      return editor.getModel()?.getValueInRange(selection).length ?? 0;
+    };
+
+    // How many characters the keystroke currently being processed is about to
+    // replace. Typing over a selection — including the select-all-and-retype
+    // that starts many rewrites — removes the whole selection and inserts one
+    // character, and a Backspace over a selection removes all of it rather than
+    // one character. Both are ordinary editing, and neither was accounted for:
+    // the keyup handler recorded a single `key` or a `len`-less `delete`, so a
+    // 400-character paragraph typed over left the trace claiming one character
+    // had changed. Same class of hole as the cut and undo/redo gaps the prior
+    // revisions closed — a mutation of the buffer with no record of its size —
+    // and the same three consequences: the trace stops being the canonical
+    // account of the document, `deletionRate` (which the integrity score reads)
+    // under-reports real revision work, and Phase 3.4's content-reconstruction
+    // check has a mutation it can't reconcile.
+    //
+    // Captured on *keydown*, because by keyup Monaco has already applied the
+    // edit and the selection is gone. Consumed exactly once by the keyup that
+    // follows and reset on read, so a keydown whose keyup is skipped (a
+    // navigation key, a command combo) can never leak its value into a later
+    // keystroke.
+    //
+    // Tab is deliberately excluded: with a selection, Monaco indents the
+    // selected lines rather than replacing them, so treating it as a removal
+    // would fabricate a deletion that never happened. Under-recording a rare
+    // Tab-over-selection is the status quo; inventing evidence is not.
+    let replacedByKeyDown = 0;
+    const takeReplacedLength = (): number => {
+      const len = replacedByKeyDown;
+      replacedByKeyDown = 0;
+      return len;
+    };
+
     // A cut removes text from the document, so it is recorded as the deletion
     // it is — carrying `len`, the way `paste_internal` carries the length it
     // inserts, because a cut takes out a whole selection rather than one
@@ -133,6 +170,11 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
 
     // Block external paste - intercept clipboard
     editor.onKeyDown((e) => {
+      // Read the selection this keystroke is about to replace before Monaco
+      // applies the edit — see `replacedByKeyDown` above for why the keyup
+      // handler can't do it itself.
+      replacedByKeyDown = e.code === 'Tab' ? 0 : selectionLength();
+
       // Handle paste attempt (Cmd+V / Ctrl+V)
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyV') {
         e.preventDefault();
@@ -143,10 +185,25 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
           // Allow internal paste
           const selection = editor.getSelection();
           if (selection) {
+            // An internal paste over a selection *replaces* it, so it removes
+            // text as well as inserting it — and only the insertion was ever
+            // recorded. Read the replaced length before `executeEdits()` runs,
+            // then record the removal ahead of the insertion, in the order the
+            // buffer actually performs them (the same both-halves treatment the
+            // undo/redo handler gives a step that removes and inserts).
+            const replacedLength = takeReplacedLength();
             editor.executeEdits('internal-paste', [{
               range: selection,
               text: internalClipboard.current,
             }]);
+            if (replacedLength > 0) {
+              recordEvent({
+                type: 'delete',
+                key: 'Replace',
+                pos: selection.startColumn,
+                len: replacedLength,
+              });
+            }
             recordEvent({
               type: 'paste_internal',
               pos: selection.startColumn,
@@ -203,10 +260,18 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
       // so a Cmd/Ctrl+Backspace (delete-word/delete-to-line-start) still counts
       // as the deletion it is.
       if (e.code === 'Backspace' || e.code === 'Delete') {
+        // A Backspace over a selection removes the whole selection, not one
+        // character. Carry `len` the way a cut and an undo already do, so the
+        // trace records the size of what left the buffer; a plain
+        // single-character Backspace still records no `len`, which is what
+        // every consumer already reads as one (`event.len ?? 1`), so existing
+        // traces and the /verify playback are untouched.
+        const replaced = takeReplacedLength();
         recordEvent({
           type: 'delete',
           key: e.code,
           pos,
+          ...(replaced > 0 ? { len: replaced } : {}),
         });
         return;
       }
@@ -246,6 +311,22 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
           e.code === 'Minus' || e.code === 'Equal' ||
           e.code === 'Slash' || e.code === 'Backslash' ||
           e.code === 'Backquote' || e.code === 'IntlBackslash') {
+        // Typing over a selection replaces it: the selection is removed and
+        // one character is inserted. Record the removal that the single `key`
+        // event below has never accounted for, so a select-all-and-retype is
+        // in the trace as the wholesale deletion it is rather than as one
+        // keystroke. `key: 'Replace'` names the verb the way 'Cut' / 'Undo' /
+        // 'Redo' do; no new event type is needed, since a removal is the
+        // `delete` it already is.
+        const replaced = takeReplacedLength();
+        if (replaced > 0) {
+          recordEvent({
+            type: 'delete',
+            key: 'Replace',
+            pos,
+            len: replaced,
+          });
+        }
         recordEvent({
           type: 'key',
           key: e.code,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useSyncExternalStore } from 'react';
-import { getRecentCertifications, getStreakSummary, type CertificationRecord } from '@/lib/history';
+import { getRecentCertifications, getStreakSummary, type CertificationRecord, type StreakSummary } from '@/lib/history';
 import { ProofList } from '@/components/ProofList';
 
 // A returning writer's own certified pieces, recalled from the local-first
@@ -53,10 +53,13 @@ const EXPANDED_LIMIT = 25;
 // there is no change to subscribe to.
 interface ProofsSnapshot {
   proofs: CertificationRecord[];
-  total: number;
+  summary: StreakSummary;
 }
 
-const EMPTY_SNAPSHOT: ProofsSnapshot = { proofs: [], total: 0 };
+const EMPTY_SNAPSHOT: ProofsSnapshot = {
+  proofs: [],
+  summary: { total: 0, streak: 0, best: 0 },
+};
 const noopSubscribe = () => () => {};
 
 export function YourProofs() {
@@ -65,17 +68,21 @@ export function YourProofs() {
 
   // Read the expandable set once, then slice per render — expanding is a view
   // change, not a new read, so the store snapshot stays referentially stable.
-  const { proofs, total } = useSyncExternalStore(
+  const { proofs, summary } = useSyncExternalStore(
     noopSubscribe,
     () =>
       (snapshot.current ??= {
         proofs: getRecentCertifications(EXPANDED_LIMIT),
-        total: getStreakSummary().total,
+        // The whole summary, not just `total`. This call already ran here and
+        // its `streak` / `best` were discarded — see the streak line below.
+        summary: getStreakSummary(),
       }),
     () => EMPTY_SNAPSHOT
   );
 
   if (proofs.length === 0) return null;
+
+  const { total } = summary;
 
   const visible = expanded ? proofs : proofs.slice(0, COLLAPSED_LIMIT);
   // Records past EXPANDED_LIMIT — unreachable from this list even when it is
@@ -92,9 +99,35 @@ export function YourProofs() {
       </div>
 
       <section className="max-w-3xl mx-auto px-6 py-20 md:py-24">
-        <h2 className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-10 text-center">
-          Your proofs
-        </h2>
+        <div className="mb-10 text-center">
+          <h2 className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em]">
+            Your proofs
+          </h2>
+          {/* The Phase 1.4 habit loop, on the surface a returning writer
+              actually lands on. The streak already greets them on `/write` (as
+              they sit down) and rewards them on `/success/<hash>` (right after
+              certifying) — but `/` is the page they arrive at, and it was the
+              one surface that recalled the *work* without ever reflecting the
+              *habit*. Nothing extra is read for it: `getStreakSummary()` was
+              already being called here for the total and its `streak`/`best`
+              thrown away.
+
+              Shown from two days on, matching the `/write` pill and the
+              `/success` pill — a "1-day streak" is just today, which is not yet
+              a habit worth naming. "Best yet" mirrors the personal-best
+              recognition on `/success` so the milestone reads the same wherever
+              the writer meets it. */}
+          {summary.streak > 1 && (
+            <p className="mt-3 text-sm text-deep-blue/50">
+              <span className="font-semibold text-deep-blue">{summary.streak}</span>-day streak
+              {summary.streak === summary.best && (
+                <span className="ml-2 text-[11px] font-medium text-success uppercase tracking-wider">
+                  Best yet
+                </span>
+              )}
+            </p>
+          )}
+        </div>
 
         {/* The list itself is the shared `ProofList` — the same rows the
             `/success/<hash>` recall list renders. The landing page's narrower
