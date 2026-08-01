@@ -58,7 +58,7 @@ interface ProofsSnapshot {
 
 const EMPTY_SNAPSHOT: ProofsSnapshot = {
   proofs: [],
-  summary: { total: 0, streak: 0, best: 0 },
+  summary: { total: 0, streak: 0, best: 0, certifiedToday: false },
 };
 const noopSubscribe = () => () => {};
 
@@ -123,6 +123,19 @@ export function YourProofs() {
               {summary.streak === summary.best && (
                 <span className="ml-2 text-[11px] font-medium text-success uppercase tracking-wider">
                   Best yet
+                </span>
+              )}
+              {/* The streak counts today *or* yesterday as its anchor, so a run
+                  that has not been extended today still renders as a healthy
+                  "4-day streak" right up until midnight silently ends it. That
+                  is the one moment in the habit loop where saying something
+                  changes the outcome — and `/` is where the writer is standing
+                  when the decision gets made. Stated as the fact it is rather
+                  than as a countdown or a warning colour: this is a writing
+                  ritual, not a game with a life bar. */}
+              {!summary.certifiedToday && (
+                <span className="block mt-1 text-xs text-deep-blue/40">
+                  Write today to keep it going.
                 </span>
               )}
             </p>

@@ -29,6 +29,11 @@ export interface StreakSummary {
   total: number;
   streak: number; // consecutive days ending today (or yesterday, if user hasn't certified today)
   best: number; // longest run of consecutive certifying days ever (personal best)
+  // Whether the run already includes today. A streak anchored on *yesterday* is
+  // still active right now but ends at midnight — the one moment in the habit
+  // loop where telling the writer changes the outcome. Without this the streak
+  // reads identically whether it is banked or expiring.
+  certifiedToday: boolean;
 }
 
 function readHistory(): CertificationRecord[] {
@@ -129,7 +134,7 @@ export function getRecentCertifications(limit = 5, excludeHash?: string): Certif
 
 function summarize(history: CertificationRecord[]): StreakSummary {
   const total = history.length;
-  if (total === 0) return { total: 0, streak: 0, best: 0 };
+  if (total === 0) return { total: 0, streak: 0, best: 0, certifiedToday: false };
 
   const days = new Set(history.map(r => dayKey(r.certifiedAt)));
   const best = longestRun(history);
@@ -137,14 +142,15 @@ function summarize(history: CertificationRecord[]): StreakSummary {
   // Allow today OR yesterday as the anchor: someone who certified yesterday
   // but not yet today still has an active streak as of right now.
   const yesterday = addDays(today, -1);
+  const certifiedToday = days.has(dayKey(today.getTime()));
 
   let cursor: Date;
-  if (days.has(dayKey(today.getTime()))) {
+  if (certifiedToday) {
     cursor = today;
   } else if (days.has(dayKey(yesterday.getTime()))) {
     cursor = yesterday;
   } else {
-    return { total, streak: 0, best };
+    return { total, streak: 0, best, certifiedToday };
   }
 
   let streak = 0;
@@ -152,7 +158,7 @@ function summarize(history: CertificationRecord[]): StreakSummary {
     streak++;
     cursor = addDays(cursor, -1);
   }
-  return { total, streak, best };
+  return { total, streak, best, certifiedToday };
 }
 
 // Longest run of consecutive calendar days the writer ever certified on — the

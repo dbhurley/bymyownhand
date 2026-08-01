@@ -70,6 +70,11 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
 
   const eventsRef = useRef<KeystrokeEvent[]>(initialDraft?.events ?? []);
   const internalClipboard = useRef<string>('');
+  // Detaches the window-level clipboard/drag guards installed on mount — see
+  // `handleEditorMount`. They outlive the editor's own DOM node, so unlike the
+  // node-scoped listeners they replaced, they have to be removed explicitly.
+  const detachGuardsRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => detachGuardsRef.current?.(), []);
   // Type the editor ref from the OnMount callback's own first parameter rather
   // than `any`, so the ref reflects the real Monaco editor instance type without
   // pulling in a direct `monaco-editor` import.
@@ -145,6 +150,42 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
       return len;
     };
 
+    // Insert the writer's own copied text at the cursor, recording both halves
+    // of what the buffer does: an intra-editor paste over a selection *replaces*
+    // it, so it removes text as well as inserting it. Shared by the Cmd/Ctrl+V
+    // keydown branch and the native-paste route below, which reach the same
+    // allowed operation by different paths and must record it identically.
+    // The replaced length is measured here rather than taken from the keydown
+    // capture: `executeEdits()` has not run yet, so the selection is still
+    // intact on both paths, and the native route has no keydown of its own to
+    // read. The keydown capture is still *consumed* so it cannot leak into the
+    // next keystroke.
+    const applyInternalPaste = (text: string) => {
+      const selection = editor.getSelection();
+      if (!selection) return;
+      takeReplacedLength();
+      const replacedLength = selectionLength();
+      editor.executeEdits('internal-paste', [{ range: selection, text }]);
+      if (replacedLength > 0) {
+        recordEvent({
+          type: 'delete',
+          key: 'Replace',
+          pos: selection.startColumn,
+          len: replacedLength,
+        });
+      }
+      recordEvent({
+        type: 'paste_internal',
+        pos: selection.startColumn,
+        len: text.length,
+      });
+    };
+
+    // When the Cmd/Ctrl+V branch last handled a paste, so the native-paste
+    // guard below can tell "the keyboard path already dealt with this action"
+    // from "a genuinely separate paste attempt."
+    let lastKeyboardPasteAt = -1;
+
     // A cut removes text from the document, so it is recorded as the deletion
     // it is — carrying `len`, the way `paste_internal` carries the length it
     // inserts, because a cut takes out a whole selection rather than one
@@ -180,36 +221,12 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
         e.preventDefault();
         e.stopPropagation();
 
+        lastKeyboardPasteAt = Date.now();
+
         // Check if we have internal clipboard content
         if (internalClipboard.current) {
           // Allow internal paste
-          const selection = editor.getSelection();
-          if (selection) {
-            // An internal paste over a selection *replaces* it, so it removes
-            // text as well as inserting it — and only the insertion was ever
-            // recorded. Read the replaced length before `executeEdits()` runs,
-            // then record the removal ahead of the insertion, in the order the
-            // buffer actually performs them (the same both-halves treatment the
-            // undo/redo handler gives a step that removes and inserts).
-            const replacedLength = takeReplacedLength();
-            editor.executeEdits('internal-paste', [{
-              range: selection,
-              text: internalClipboard.current,
-            }]);
-            if (replacedLength > 0) {
-              recordEvent({
-                type: 'delete',
-                key: 'Replace',
-                pos: selection.startColumn,
-                len: replacedLength,
-              });
-            }
-            recordEvent({
-              type: 'paste_internal',
-              pos: selection.startColumn,
-              len: internalClipboard.current.length,
-            });
-          }
+          applyInternalPaste(internalClipboard.current);
         } else {
           // Block external paste
           setBlockedPasteCount(prev => prev + 1);
@@ -386,52 +403,92 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
     // (where most of the traffic is, and where there is no Cmd+V at all),
     // Shift+Insert on Windows/Linux, middle-click paste on X11, and the
     // browser's own Edit ▸ Paste menu each produce a native `paste` event with
-    // no Cmd/Ctrl+V keydown for us to preventDefault. Verified against the
-    // running editor: a `paste` event dispatched at the editor reached no
-    // application handler at all — the React `onPaste` on the overlay below is
-    // dead code for this, since the overlay is a sibling of Monaco's input
-    // element rather than an ancestor of it. So whether those routes inserted
-    // text was left entirely to Monaco's internals, and either way the attempt
-    // left no record: no `paste_blocked` event in the certified trace, no
-    // counter, no notice to the writer.
+    // no Cmd/Ctrl+V keydown for us to preventDefault.
     //
-    // Blocking external paste is the product's core promise, so it is guarded
-    // at the application layer where the outcome is ours, and every attempt is
-    // recorded exactly the way the keyboard path records it. Capture phase, so
-    // it runs before Monaco's own paste handling. The *allowed* intra-editor
-    // paste path is unaffected: it is applied through `executeEdits()` above
-    // and never produces a clipboard event.
-    editor.getDomNode()?.addEventListener('paste', (e) => {
+    // These guards used to be registered on `editor.getDomNode()` — one level
+    // too low to be reached. Monaco registers its own clipboard handlers on the
+    // editor's *container* (the parent of `.monaco-editor`) and stops the event
+    // there, so on the way down to the focused input the container runs first
+    // and the listeners below never saw a single native `paste`, `copy`, or
+    // `cut`. Verified against the running editor: a `paste` delivered to
+    // Monaco's `.native-edit-context` host — the element a real paste actually
+    // targets — inserted `PASTED_AI_TEXT_ABC` straight into the document, with
+    // the blocked-paste counter at **0** and the certified trace **empty**.
+    // That is the product's central promise failing on the majority platform:
+    // pasted text lands in the document and the certificate reports a clean
+    // session, because there is nothing in the trace to say otherwise. The same
+    // root cause silenced the other two verbs — a native `cut` removed a
+    // selection while recording nothing (the removal is meant to be a `delete`
+    // carrying its `len`), and a non-keyboard `copy` never populated the
+    // internal clipboard, so the writer's own text read as external on the way
+    // back in.
+    //
+    // Registered on `window` in the capture phase instead, which runs before
+    // any listener inside the editor's subtree no matter where Monaco attaches
+    // its own, and scoped to events whose target is inside this editor so the
+    // rest of the page (the title input above, which is not part of the
+    // certified trace) is untouched. The *allowed* intra-editor paste is
+    // unaffected: it is applied through `executeEdits()` and never produces a
+    // clipboard event.
+    const isInsideEditor = (e: Event): boolean => {
+      const node = editor.getDomNode();
+      return !!node && e.target instanceof Node && node.contains(e.target);
+    };
+
+    const onPaste = (e: ClipboardEvent) => {
+      if (!isInsideEditor(e)) return;
       e.preventDefault();
       e.stopPropagation();
+
+      // The Cmd/Ctrl+V keydown branch above already handled this action. It
+      // preventDefaults the keydown, so no native paste normally follows — but
+      // a platform that delivers both would otherwise paste twice, or count one
+      // attempt as two. Collapsed the same way `recordCut()` collapses a cut
+      // that trips both of its hooks.
+      if (Date.now() - lastKeyboardPasteAt < 250) return;
+
+      // Now that the event actually reaches us, the system clipboard is
+      // readable — so this route can make the *accurate* version of the
+      // judgement the keyboard route has to guess at, and allow a paste only
+      // when its content is exactly the text the writer copied inside this
+      // editor. Without it, a mobile writer moving their own paragraph was
+      // blocked and charged 10 integrity points for ordinary editing — the same
+      // false positive the non-keyboard `copy` hook exists to prevent, on the
+      // way back in. Anything else is external and blocked, whatever the
+      // internal clipboard happens to hold.
+      const pasted = e.clipboardData?.getData('text/plain') ?? '';
+      if (pasted && pasted === internalClipboard.current) {
+        applyInternalPaste(pasted);
+        return;
+      }
+
       setBlockedPasteCount(prev => prev + 1);
       flashPasteBlocked();
       recordEvent({
         type: 'paste_blocked',
         pos: editor.getPosition()?.column || 0,
       });
-    }, true);
+    };
 
-    // The same routes the `paste` listener above exists to cover — a long-press
-    // → Copy/Cut on mobile, the browser's Edit ▸ Copy/Cut menu, Shift+Delete —
-    // reach copy and cut without any Cmd/Ctrl keydown for the handler above to
-    // see, so those verbs get a DOM-level listener too. `recordCut()` is
-    // idempotent within one action, so a route that fires *both* a keydown and
-    // a native `cut` event still records the deletion exactly once.
-    //
-    // Not prevented: cut and copy are allowed operations — the lockdown is about
-    // what comes *in* from the system clipboard, not what the writer does with
-    // their own text — and Monaco performs the removal and clipboard write.
-    editor.getDomNode()?.addEventListener('copy', () => {
+    // Copy and cut are *allowed* operations — the lockdown is about what comes
+    // in from the system clipboard, not what the writer does with their own
+    // text — so neither is prevented; Monaco performs the removal and the
+    // clipboard write. `recordCut()` is idempotent within one action, so a
+    // route that fires both a Cmd/Ctrl+X keydown and a native `cut` still
+    // records the deletion exactly once.
+    const onCopy = (e: ClipboardEvent) => {
+      if (!isInsideEditor(e)) return;
       syncInternalClipboard();
-    }, true);
+    };
 
-    editor.getDomNode()?.addEventListener('cut', () => {
+    const onCut = (e: ClipboardEvent) => {
+      if (!isInsideEditor(e)) return;
       recordCut();
-    }, true);
+    };
 
     // Block drag-and-drop
-    editor.getDomNode()?.addEventListener('drop', (e) => {
+    const onDrop = (e: DragEvent) => {
+      if (!isInsideEditor(e)) return;
       e.preventDefault();
       e.stopPropagation();
       setBlockedPasteCount(prev => prev + 1);
@@ -440,11 +497,26 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
         type: 'paste_blocked',
         pos: editor.getPosition()?.column || 0,
       });
-    });
+    };
 
-    editor.getDomNode()?.addEventListener('dragover', (e) => {
+    const onDragOver = (e: DragEvent) => {
+      if (!isInsideEditor(e)) return;
       e.preventDefault();
-    });
+    };
+
+    window.addEventListener('paste', onPaste, true);
+    window.addEventListener('copy', onCopy, true);
+    window.addEventListener('cut', onCut, true);
+    window.addEventListener('drop', onDrop, true);
+    window.addEventListener('dragover', onDragOver, true);
+
+    detachGuardsRef.current = () => {
+      window.removeEventListener('paste', onPaste, true);
+      window.removeEventListener('copy', onCopy, true);
+      window.removeEventListener('cut', onCut, true);
+      window.removeEventListener('drop', onDrop, true);
+      window.removeEventListener('dragover', onDragOver, true);
+    };
   };
 
   const handleEditorChange = (value: string | undefined) => {
