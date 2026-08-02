@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import type { WritingSession } from '@/lib/types';
 import { computeWpm, formatDuration, getScoreLabel, getSessionWritingTime } from '@/lib/metrics';
-import { buildEmbedSnippets } from '@/lib/embed';
+import { buildEmbedSnippets, EMBED_FORMATS, type EmbedFormat } from '@/lib/embed';
 import { getRecentCertifications, recordCertification, type CertificationRecord, type StreakSummary } from '@/lib/history';
 import { buildVerifyUrl } from '@/lib/site';
 import { buildLinkedInShareUrl, buildTweetUrl } from '@/lib/share';
@@ -32,7 +32,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
   const [session, setSession] = useState<SessionData | null>(null);
   const [copied, setCopied] = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
-  const [embedFormat, setEmbedFormat] = useState<'markdown' | 'html'>('markdown');
+  const [embedFormat, setEmbedFormat] = useState<EmbedFormat>('markdown');
   const [streakSummary, setStreakSummary] = useState<StreakSummary | null>(null);
   const [recentProofs, setRecentProofs] = useState<CertificationRecord[]>([]);
 
@@ -102,8 +102,9 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
   const tweetText = `I wrote "${shareTitle}" by my own hand — every keystroke proven human.`;
   const tweetUrl = buildTweetUrl(tweetText, verifyUrl);
   const linkedInUrl = buildLinkedInShareUrl(verifyUrl);
-  const embeds = buildEmbedSnippets(verifyUrl);
-  const embedSnippet = embedFormat === 'markdown' ? embeds.markdown : embeds.html;
+  const embeds = buildEmbedSnippets(verifyUrl, hash);
+  const embedSnippet = embeds[embedFormat];
+  const embedFormatMeta = EMBED_FORMATS.find(f => f.id === embedFormat)!;
 
   const writingTime = session ? getSessionWritingTime(session) : 0;
   // Fall back to a real text-color class, not an empty string, for the brief
@@ -283,24 +284,18 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
                 swap the snippet below. Accessibility-honesty sibling of the
                 §6.39 playback-control and §6.29 verification-link a11y fixes. */}
             <div className="flex items-center gap-1 p-0.5 bg-deep-blue/[0.04] rounded-full" role="group" aria-label="Embed format">
-              <button
-                aria-pressed={embedFormat === 'markdown'}
-                onClick={() => setEmbedFormat('markdown')}
-                className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                  embedFormat === 'markdown' ? 'bg-deep-blue text-cream' : 'text-deep-blue/50 hover:text-deep-blue'
-                }`}
-              >
-                Markdown
-              </button>
-              <button
-                aria-pressed={embedFormat === 'html'}
-                onClick={() => setEmbedFormat('html')}
-                className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                  embedFormat === 'html' ? 'bg-deep-blue text-cream' : 'text-deep-blue/50 hover:text-deep-blue'
-                }`}
-              >
-                HTML
-              </button>
+              {EMBED_FORMATS.map(format => (
+                <button
+                  key={format.id}
+                  aria-pressed={embedFormat === format.id}
+                  onClick={() => setEmbedFormat(format.id)}
+                  className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                    embedFormat === format.id ? 'bg-deep-blue text-cream' : 'text-deep-blue/50 hover:text-deep-blue'
+                  }`}
+                >
+                  {format.label}
+                </button>
+              ))}
             </div>
           </div>
           <div className="flex items-stretch gap-3">
@@ -315,7 +310,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
             <code
               tabIndex={0}
               role="group"
-              aria-label={`${embedFormat === 'markdown' ? 'Markdown' : 'HTML'} embed badge snippet`}
+              aria-label={`${embedFormatMeta.label} embed badge snippet`}
               className="flex-1 px-3 py-2.5 bg-deep-blue/[0.04] rounded-lg text-xs font-mono text-deep-blue/70 overflow-x-auto whitespace-nowrap"
             >
               {embedSnippet}
@@ -332,9 +327,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
             </button>
           </div>
           <p className="text-xs text-deep-blue/35 mt-3">
-            {embedFormat === 'markdown'
-              ? 'Markdown works in Substack, Ghost, Notion, and READMEs.'
-              : 'HTML works on WordPress, raw-HTML blocks, and email signatures.'}
+            {embedFormatMeta.hint}
           </p>
         </div>
 
