@@ -70,6 +70,46 @@ export async function initializeDatabase() {
   `;
 }
 
+// `initializeDatabase()` above was exported and documented — CLAUDE.md still
+// describes the schema as "initialized in src/lib/db.ts" — but nothing in the
+// application ever called it. So on a `DATABASE_URL` pointing at a database that
+// has never had the schema applied by hand (a fresh Neon project, a preview
+// branch, a new environment, a local Postgres), every `INSERT` in
+// `createDocument()` fails with `relation "documents" does not exist`, the
+// route's `catch (dbError)` swallows it as an MVP degradation, and the writer is
+// told their document is certified while nothing is persisted. Their proof link
+// then resolves for exactly as long as their own `sessionStorage` survives, and
+// 404s for everyone they shared it with — the failure mode the PRD's
+// "Database optionality drift" risk names, arriving silently.
+//
+// Ensure the schema once per server lifetime, on the write path only (the read
+// path has nothing to create, and a `SELECT` against a missing table already
+// surfaces as the 404 it is). The check is a single `to_regclass()` lookup, so
+// the steady state costs one cheap roundtrip on the first certification a server
+// instance handles and nothing after that; the DDL itself is
+// `CREATE TABLE IF NOT EXISTS`, so it is a no-op against a database that already
+// has the schema — which is every environment provisioned by hand today.
+//
+// The memo is dropped when the attempt fails so a transient error doesn't leave
+// a server instance permanently convinced the schema is unavailable.
+let schemaReady: Promise<void> | null = null;
+
+export function ensureSchema(): Promise<void> {
+  if (!schemaReady) {
+    schemaReady = (async () => {
+      const sql = getSql();
+      if (!sql) return;
+      const results = await sql`SELECT to_regclass('public.documents') AS documents`;
+      if (results[0]?.documents) return;
+      await initializeDatabase();
+    })().catch((error) => {
+      schemaReady = null;
+      throw error;
+    });
+  }
+  return schemaReady;
+}
+
 // Helper to get document by hash
 export async function getDocumentByHash(hash: string) {
   const sql = getSql();
@@ -109,6 +149,16 @@ export async function createDocument(doc: {
   if (!sql) {
     console.warn('No DATABASE_URL configured, document not persisted');
     return doc;
+  }
+
+  // Best-effort: a database whose role can't run DDL (a locked-down production
+  // grant) should still take the INSERT, which is the operation that matters
+  // here. Log and continue rather than failing a real writer's certification
+  // over a schema check.
+  try {
+    await ensureSchema();
+  } catch (error) {
+    console.error('Schema initialization failed:', error);
   }
 
   await sql`
