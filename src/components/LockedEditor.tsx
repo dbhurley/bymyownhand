@@ -761,18 +761,28 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
         {/* Blocked-paste notice. Sits at the bottom of the writing surface,
             close to where the cursor and the writer's attention are, and fades
             itself out after 3s so it never becomes chrome. Pointer-events are
-            off so it can't intercept a click into the editor. */}
-        {pasteBlockedNotice && (
-          <div className="absolute bottom-6 left-0 right-0 flex justify-center px-6 pointer-events-none">
-            <div
-              role="status"
-              aria-live="polite"
-              className="max-w-sm px-4 py-2.5 bg-deep-blue text-cream text-xs leading-relaxed text-center rounded-full shadow-lg shadow-deep-blue/20"
-            >
+            off so it can't intercept a click into the editor.
+
+            The live region is the wrapper, which is now always mounted — only
+            its *contents* appear and disappear. A `role="status"` element that
+            is inserted into the DOM at the same moment as its text is not
+            reliably announced: screen readers watch regions they already know
+            about, so a region that arrives carrying its message often produces
+            silence. Previously the whole notice — region included — was
+            conditionally rendered, which is exactly that pattern, on the one
+            event the product exists to perform. The empty wrapper renders
+            nothing visible and costs nothing. */}
+        <div
+          role="status"
+          aria-live="polite"
+          className="absolute bottom-6 left-0 right-0 flex justify-center px-6 pointer-events-none"
+        >
+          {pasteBlockedNotice && (
+            <div className="max-w-sm px-4 py-2.5 bg-deep-blue text-cream text-xs leading-relaxed text-center rounded-full shadow-lg shadow-deep-blue/20">
               External paste blocked — your words have to be typed here.
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Empty state hint */}
         {wordCount === 0 && (

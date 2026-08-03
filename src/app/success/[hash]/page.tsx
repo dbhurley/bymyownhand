@@ -271,7 +271,10 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
             </a>
           </div>
 
-          <div className="flex items-center justify-between mb-3">
+          {/* Wraps rather than overflows: the switcher carries four formats
+              since the iframe variant shipped, which no longer fits beside the
+              label on a narrow phone. */}
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em]">
               Embed badge
             </p>

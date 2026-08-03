@@ -23,13 +23,22 @@ import { getSiteUrl } from './site';
 // `height="auto"` is invalid and gets stripped by stricter CMS sanitizers. The
 // raster is square (192×192), so width=120 → height=120 keeps the aspect ratio.
 
-export type EmbedFormat = 'markdown' | 'html' | 'script';
+export type EmbedFormat = 'markdown' | 'html' | 'script' | 'iframe';
 
 export interface EmbedSnippets {
   markdown: string;
   html: string;
   script: string;
+  iframe: string;
 }
+
+// The rendered pill is ~197×36 CSS pixels (a 22px mark, an 8px gap, the
+// "Verified human-written" label at 13px, and the pill's own padding + border).
+// The frame is sized a little past that so the badge never clips at a reader's
+// default font settings, and `/embed/<hash>` paints a transparent background so
+// the slack is invisible on any host page.
+const IFRAME_WIDTH = 210;
+const IFRAME_HEIGHT = 40;
 
 export function buildEmbedSnippets(verifyUrl: string, hash: string): EmbedSnippets {
   const siteUrl = getSiteUrl();
@@ -43,6 +52,12 @@ export function buildEmbedSnippets(verifyUrl: string, hash: string): EmbedSnippe
     // gone, so it must name the canonical host — the same reasoning as
     // `getCanonicalVerifyUrl()` for the certificate's printed link and QR code.
     script: `<script src="${siteUrl}/embed.js" data-hash="${hash}" async></script>`,
+    // Same canonical-host reasoning as the script variant — this snippet also
+    // has to keep resolving from someone else's page long after the tab that
+    // copied it is gone. `title` is the frame's accessible name (a frame
+    // without one is announced as an unlabelled region), and `loading="lazy"`
+    // keeps a badge below the fold off the host page's critical path.
+    iframe: `<iframe src="${siteUrl}/embed/${hash}" title="Verified human-written" width="${IFRAME_WIDTH}" height="${IFRAME_HEIGHT}" style="border:0" loading="lazy"></iframe>`,
   };
 }
 
@@ -67,5 +82,10 @@ export const EMBED_FORMATS: { id: EmbedFormat; label: string; hint: string }[] =
     id: 'script',
     label: 'Script',
     hint: 'The script renders a labelled badge — and updates wherever it is embedded.',
+  },
+  {
+    id: 'iframe',
+    label: 'iframe',
+    hint: 'The iframe renders the same labelled badge on hosts that strip scripts.',
   },
 ];
