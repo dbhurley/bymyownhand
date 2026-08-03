@@ -7,7 +7,7 @@ import Link from 'next/link';
 import type { WritingSession } from '@/lib/types';
 import { clearDraft, formatDraftAge, formatDraftExpiry, loadDraft, type DraftSnapshot } from '@/lib/draft';
 import { countWords } from '@/lib/metrics';
-import { getStreakSummary, type StreakSummary } from '@/lib/history';
+import { getStreakSummary, recordCertification, type StreakSummary } from '@/lib/history';
 import {
   breadcrumbListJsonLd,
   faqPageJsonLd,
@@ -111,16 +111,47 @@ export default function WritePage() {
         throw new Error(data.error || 'Failed to submit document');
       }
 
-      // Store session data in sessionStorage for the success page
-      sessionStorage.setItem('lastSession', JSON.stringify({
-        ...session,
-        verificationHash: data.verificationHash,
-        documentId: data.documentId,
-        title: title || 'Untitled Document',
-      }));
+      const hash = data.verificationHash;
+      const certifiedTitle = title || 'Untitled Document';
+
+      // The document is already certified server-side by the time we get here,
+      // so nothing below is allowed to report the certification as a failure.
+      // `sessionStorage.setItem` can throw: the payload carries the whole
+      // keystroke trace (a long piece runs to megabytes, against a ~5MB origin
+      // quota), and some privacy modes reject storage writes outright. The call
+      // used to sit inside this function's outer `try`, so a throw took the
+      // writer down the catch path — "Something went wrong" in the header, the
+      // draft kept, and *no proof link at all* for a document that had just
+      // been certified. Pressing Complete again then minted a second hash for
+      // the same piece.
+      try {
+        sessionStorage.setItem('lastSession', JSON.stringify({
+          ...session,
+          verificationHash: hash,
+          documentId: data.documentId,
+          title: certifiedTitle,
+        }));
+      } catch {
+        // Without the handoff payload `/success/<hash>` has nothing to render
+        // and redirects to `/verify/<hash>` on its own, so go straight there.
+        // Record the certification here too: `/success` is what normally writes
+        // it into the local history that the streak and the proof-recall lists
+        // read, and skipping that page would silently break the writer's streak
+        // on the one day their storage was full. `recordCertification()` is
+        // idempotent on the hash and swallows its own storage failures.
+        recordCertification({
+          hash,
+          certifiedAt: Date.now(),
+          wordCount: session.wordCount,
+          integrityScore: session.integrityScore ?? 0,
+          title: certifiedTitle,
+        });
+        router.push(`/verify/${hash}`);
+        return true;
+      }
 
       // Redirect to success/verification page
-      router.push(`/success/${data.verificationHash}`);
+      router.push(`/success/${hash}`);
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');

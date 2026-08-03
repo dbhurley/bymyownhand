@@ -20,8 +20,14 @@ export default function robots(): MetadataRoute.Robots {
   // page that wastes crawl budget on a payload no reader should land on. Same
   // principle as the /success/ rule. /api/blog/feed.json stays crawlable — it's
   // a discovery surface (the JSON Feed) we *want* found.
+  //
+  // And disallow /embed/ — the iframe badge fragment. It is a chromeless pill
+  // whose only content is a link to `/verify/<hash>`, so indexing it would put
+  // a contentless duplicate of the proof page into results. The route already
+  // declares `noindex` in its own metadata; this keeps crawl budget off it in
+  // the first place, the same way the /success rule does.
   return {
-    rules: [{ userAgent: '*', allow: '/', disallow: ['/success/', '/api/documents/'] }],
+    rules: [{ userAgent: '*', allow: '/', disallow: ['/success/', '/embed/', '/api/documents/'] }],
     // Declare the site's canonical host. Crawlers that honor the `Host`
     // directive (Yandex most notably) use it to pick one preferred mirror when
     // the same content is reachable on multiple hostnames (apex vs. www, a
