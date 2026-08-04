@@ -1,5 +1,13 @@
 import type { Metadata } from 'next';
 import { isValidVerificationHash } from '@/lib/hash';
+import {
+  BADGE_LABEL,
+  BADGE_LINK_TITLE,
+  BADGE_MARK_CSS,
+  BADGE_MARK_PATH,
+  BADGE_MARK_SIZE,
+  BADGE_PILL_CSS,
+} from '@/lib/embed';
 
 // The Phase 1.3 `iframe` badge variant — the last open item of the embed
 // flywheel, and the one that reaches the hosts the other three can't.
@@ -33,6 +41,28 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
+// The badge sits inside someone else's page, so the app's own body chrome must
+// not: `globals.css` paints a cream background and applies safe-area padding to
+// every surface, which inside a 40px frame renders as a cream slab with the pill
+// inset from the corner. Scoped to this route because it is the only one that is
+// a fragment rather than a page.
+//
+// Emitted *before* the hash gate below, and on every branch. It used to live
+// inside the valid-hash branch, so the one case that is supposed to render
+// nothing — a mistyped, truncated, or stale hash in a pasted snippet, which is
+// exactly the state a hand-copied `iframe` tag lands in — instead painted a bare
+// cream rectangle on the host page: the worst of both outcomes, since the reader
+// sees an unexplained block where the writer sees a broken badge, and neither
+// can tell what it is. An invalid hash now renders genuinely nothing.
+//
+// The pill's own declarations come from the shared badge definition, so this
+// variant and `/embed.js` cannot drift apart.
+const FRAGMENT_CSS = [
+  'html,body{background:transparent!important;margin:0;padding:0;min-height:0;overflow:hidden}',
+  `.bmoh-badge{${BADGE_PILL_CSS}}`,
+  `.bmoh-badge img{${BADGE_MARK_CSS}}`,
+].join('');
+
 export default async function EmbedBadgePage({
   params,
 }: {
@@ -40,54 +70,26 @@ export default async function EmbedBadgePage({
 }) {
   const { hash } = await params;
 
-  // Same gate as `/embed.js` applies to its `data-hash`: a value that can't have
-  // been minted by `generateVerificationHash()` renders nothing at all, rather
-  // than a badge linking to a proof that doesn't exist.
-  if (!isValidVerificationHash(hash)) return null;
-
   return (
     <>
-      {/* The badge sits inside someone else's page, so the app's own body
-          chrome must not: `globals.css` paints a cream background and applies
-          safe-area padding to every surface, which inside a 40px frame would
-          render as a cream slab with the pill inset from the corner. Scoped to
-          this route because it is the only one that is a fragment rather than a
-          page. */}
-      <style
-        dangerouslySetInnerHTML={{
-          __html:
-            'html,body{background:transparent!important;margin:0;padding:0;min-height:0;overflow:hidden}',
-        }}
-      />
-      <a
-        href={`/verify/${hash}`}
-        target="_blank"
-        rel="noopener"
-        title="Verify this document on By My Own Hand"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '6px 14px 6px 8px',
-          border: '1px solid rgba(30,58,95,0.15)',
-          borderRadius: '999px',
-          background: '#f5f0e8',
-          color: '#1e3a5f',
-          font: '500 13px/1.2 system-ui,-apple-system,Segoe UI,sans-serif',
-          textDecoration: 'none',
-        }}
-      >
-        {/* Decorative: the words beside it carry the meaning. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/icon-192x192.png"
-          alt=""
-          width={22}
-          height={22}
-          style={{ display: 'block', width: '22px', height: '22px', border: 0 }}
-        />
-        Verified human-written
-      </a>
+      <style dangerouslySetInnerHTML={{ __html: FRAGMENT_CSS }} />
+      {/* Same gate as `/embed.js` applies to its `data-hash`: a value that can't
+          have been minted by `generateVerificationHash()` renders no badge at
+          all, rather than one linking to a proof that doesn't exist. */}
+      {isValidVerificationHash(hash) && (
+        <a
+          className="bmoh-badge"
+          href={`/verify/${hash}`}
+          target="_blank"
+          rel="noopener"
+          title={BADGE_LINK_TITLE}
+        >
+          {/* Decorative: the words beside it carry the meaning. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={BADGE_MARK_PATH} alt="" width={BADGE_MARK_SIZE} height={BADGE_MARK_SIZE} />
+          {BADGE_LABEL}
+        </a>
+      )}
     </>
   );
 }

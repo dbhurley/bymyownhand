@@ -25,6 +25,43 @@ import { getSiteUrl } from './site';
 
 export type EmbedFormat = 'markdown' | 'html' | 'script' | 'iframe';
 
+// ─── The badge itself ───
+//
+// The whole argument for the `<script>` and `iframe` variants is that their
+// markup is *ours*: unlike the copied Markdown/HTML snippets, a change to the
+// badge's wording or styling reaches every embed already in the wild. That only
+// holds while there is one badge to change. It shipped as two hand-maintained
+// copies — a JS string in `app/embed.js/route.ts` and JSX in
+// `app/embed/[hash]/page.tsx` — carrying the same label, title, colours,
+// radius, padding, font stack, and mark size in two syntaxes. Nothing enforced
+// that they agree, so the same badge could come to read two ways depending on
+// which format a writer happened to paste, on surfaces we can't see and can't
+// fix after the fact.
+//
+// Both routes now render from these constants. Same drift-prevention shape as
+// the `buildEmbedSnippets()` / `getScoreLabel()` / `getSiteUrl()` / `ProofList`
+// consolidations — done here before a third consumer (a WordPress plugin, the
+// Phase 2.2 CMS integrations) makes it three copies.
+export const BADGE_LABEL = 'Verified human-written';
+export const BADGE_LINK_TITLE = 'Verify this document on By My Own Hand';
+
+// Raster, not `/logo.svg` — see the note above on why the embed surfaces are
+// the least SVG-friendly places we ship to. Also the logo used by the Markdown
+// and HTML snippets below, so all four formats show one mark.
+export const BADGE_MARK_PATH = '/icon-192x192.png';
+export const BADGE_MARK_SIZE = 22;
+
+// Inline CSS rather than a class: the script variant sets `style.cssText` on a
+// node inside a page whose stylesheet we don't control, so the badge must carry
+// its own appearance. The iframe variant emits the same declarations into its
+// own scoped `<style>` block.
+export const BADGE_PILL_CSS =
+  'display:inline-flex;align-items:center;gap:8px;padding:6px 14px 6px 8px;' +
+  'border:1px solid rgba(30,58,95,0.15);border-radius:999px;background:#f5f0e8;color:#1e3a5f;' +
+  'font:500 13px/1.2 system-ui,-apple-system,Segoe UI,sans-serif;text-decoration:none;';
+
+export const BADGE_MARK_CSS = `display:block;width:${BADGE_MARK_SIZE}px;height:${BADGE_MARK_SIZE}px;border:0;`;
+
 export interface EmbedSnippets {
   markdown: string;
   html: string;
@@ -42,7 +79,7 @@ const IFRAME_HEIGHT = 40;
 
 export function buildEmbedSnippets(verifyUrl: string, hash: string): EmbedSnippets {
   const siteUrl = getSiteUrl();
-  const logoUrl = `${siteUrl}/icon-192x192.png`;
+  const logoUrl = `${siteUrl}${BADGE_MARK_PATH}`;
   return {
     markdown: `[![Verified human-written](${logoUrl})](${verifyUrl})`,
     html: `<a href="${verifyUrl}" target="_blank" rel="noopener"><img src="${logoUrl}" alt="Verified human-written" width="120" height="120" /></a>`,
