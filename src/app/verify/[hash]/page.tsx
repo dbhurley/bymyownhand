@@ -235,7 +235,8 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
       <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
         <header className="flex items-center px-6 md:px-8 py-6 border-b border-deep-blue/[0.06]">
           <Link href="/" className="flex items-center gap-2.5">
-            <img src="/logo.svg" alt="By My Own Hand" width="24" height="21" className="block" />
+            {/* Decorative — the wordmark beside it carries the same words. */}
+            <img src="/logo.svg" alt="" width="24" height="21" className="block" />
             <span className="font-semibold text-deep-blue">By My Own Hand</span>
           </Link>
         </header>
@@ -310,7 +311,8 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
       {/* Header */}
       <header className="flex items-center justify-between px-6 md:px-8 py-6 border-b border-deep-blue/[0.06]">
         <Link href="/" className="flex items-center gap-2.5">
-          <img src="/logo.svg" alt="By My Own Hand" width="24" height="21" className="block" />
+          {/* Decorative — the wordmark beside it carries the same words. */}
+          <img src="/logo.svg" alt="" width="24" height="21" className="block" />
           <span className="font-semibold text-deep-blue">By My Own Hand</span>
         </Link>
         <div className="flex items-center gap-2 text-success">

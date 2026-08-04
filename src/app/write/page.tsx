@@ -164,8 +164,13 @@ export default function WritePage() {
     <div className="fixed inset-0 flex flex-col bg-cream overflow-hidden">
       {/* Header */}
       <header className="flex-shrink-0 flex items-center justify-between px-5 md:px-8 py-3 md:py-4 border-b border-deep-blue/[0.06]">
-        <Link href="/" className="flex items-center gap-2.5 hover:opacity-70 transition-opacity">
-          <img src="/logo.svg" alt="By My Own Hand" width="22" height="20" className="block" />
+        {/* The mark is decorative — the wordmark beside it is the same words,
+            and announcing both read the brand twice. The wordmark is hidden
+            below `sm`, though, so the link carries the name itself rather than
+            leaning on text that isn't always rendered; it matches the visible
+            text exactly where that text is shown (WCAG 2.5.3). */}
+        <Link href="/" aria-label="By My Own Hand" className="flex items-center gap-2.5 hover:opacity-70 transition-opacity">
+          <img src="/logo.svg" alt="" width="22" height="20" className="block" />
           <span className="font-semibold text-deep-blue text-sm hidden sm:inline">By My Own Hand</span>
         </Link>
 

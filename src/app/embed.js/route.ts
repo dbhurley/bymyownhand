@@ -1,4 +1,12 @@
 import { getSiteUrl } from '@/lib/site';
+import {
+  BADGE_LABEL,
+  BADGE_LINK_TITLE,
+  BADGE_MARK_CSS,
+  BADGE_MARK_PATH,
+  BADGE_MARK_SIZE,
+  BADGE_PILL_CSS,
+} from '@/lib/embed';
 
 // The Phase 1.3 one-line embed:
 //
@@ -16,6 +24,11 @@ import { getSiteUrl } from '@/lib/site';
 //
 // Served from a route (like `/api/blog/feed.json`) rather than `public/` so the
 // canonical host can be baked in as a fallback and the caching is explicit.
+//
+// The badge's label, link title, mark, and styling come from `lib/embed.ts`,
+// shared with the `iframe` variant at `/embed/<hash>` — the two must render the
+// same pill, and the promise that a change here reaches every embed in the wild
+// only holds while there is one definition to change.
 //
 // The script is deliberately tiny and dependency-free: it reads its own
 // `data-hash`, validates the format, and inserts one anchor where the tag sits.
@@ -47,22 +60,20 @@ function buildScript(siteUrl: string): string {
   a.href = base + '/verify/' + hash;
   a.target = '_blank';
   a.rel = 'noopener';
-  a.title = 'Verify this document on By My Own Hand';
-  a.style.cssText = 'display:inline-flex;align-items:center;gap:8px;padding:6px 14px 6px 8px;' +
-    'border:1px solid rgba(30,58,95,0.15);border-radius:999px;background:#f5f0e8;color:#1e3a5f;' +
-    'font:500 13px/1.2 system-ui,-apple-system,Segoe UI,sans-serif;text-decoration:none;';
+  a.title = ${JSON.stringify(BADGE_LINK_TITLE)};
+  a.style.cssText = ${JSON.stringify(BADGE_PILL_CSS)};
 
   var img = document.createElement('img');
-  img.src = base + '/icon-192x192.png';
+  img.src = base + ${JSON.stringify(BADGE_MARK_PATH)};
   // Decorative: the words beside it carry the meaning, so it stays out of the
   // host page's accessibility tree.
   img.alt = '';
-  img.width = 22;
-  img.height = 22;
-  img.style.cssText = 'display:block;width:22px;height:22px;border:0;';
+  img.width = ${BADGE_MARK_SIZE};
+  img.height = ${BADGE_MARK_SIZE};
+  img.style.cssText = ${JSON.stringify(BADGE_MARK_CSS)};
 
   var label = document.createElement('span');
-  label.textContent = 'Verified human-written';
+  label.textContent = ${JSON.stringify(BADGE_LABEL)};
 
   a.appendChild(img);
   a.appendChild(label);

@@ -11,8 +11,11 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
           Always-on accessibility investment, same lineage as the breadcrumb-nav
           label and the landing-page landmark fixes; no visual change. */}
       <nav aria-label="Primary" className="sticky top-0 z-50 flex items-center justify-between px-6 md:px-12 py-4 bg-white/90 backdrop-blur-md border-b border-deep-blue/5">
-        <Link href="/" className="flex items-center gap-3 hover:opacity-70 transition-opacity">
-          <img src="/logo.svg" alt="By My Own Hand" width="28" height="25" className="block" />
+        {/* Decorative mark + a link-level name, for the same reason as the
+            `/write` header: the wordmark beside it is the same words, and it is
+            hidden below `sm`. */}
+        <Link href="/" aria-label="By My Own Hand" className="flex items-center gap-3 hover:opacity-70 transition-opacity">
+          <img src="/logo.svg" alt="" width="28" height="25" className="block" />
           <span className="text-lg font-semibold text-deep-blue tracking-tight hidden sm:inline">By My Own Hand</span>
         </Link>
         <div className="flex items-center gap-6">

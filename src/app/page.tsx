@@ -9,7 +9,12 @@ export default function Home() {
       {/* Navigation */}
       <nav className="relative flex items-center justify-between max-w-3xl mx-auto px-6 py-8">
         <div className="flex items-center gap-3">
-          <img src="/logo.svg" alt="By My Own Hand" width="28" height="25" className="block" />
+          {/* Decorative: the wordmark beside it is the same words. With
+              `alt="By My Own Hand"` a screen reader read the brand twice in a
+              row here — the mark and then the text — which is the decorative-icon
+              noise the §6.63/§6.61 sweeps removed everywhere except the one
+              graphic that appears in every header on the site. */}
+          <img src="/logo.svg" alt="" width="28" height="25" className="block" />
           <span className="text-lg font-semibold text-deep-blue tracking-tight">By My Own Hand</span>
         </div>
         <div className="flex items-center gap-6">
