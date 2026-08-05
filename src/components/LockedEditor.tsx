@@ -556,6 +556,36 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
   // exists to prevent ("an accidental tab-close erases work — that single
   // event kills retention"), and a failed submit is exactly when a writer is
   // most likely to close the tab. Saving now continues across a failure.
+  // What the last successful persist wrote. The autosave ticks every 3s for the
+  // whole life of the editor, and each tick used to `JSON.stringify()` the entire
+  // keystroke trace and hand it to a synchronous `localStorage.setItem()` —
+  // whether or not anything had changed since the previous tick. The trace only
+  // grows (up to the route's 250k-event cap), so on a long piece that is a
+  // multi-hundred-kilobyte serialize plus a blocking main-thread write, twenty
+  // times a minute, on the one surface where main-thread jank is felt directly:
+  // the writer is typing into it.
+  //
+  // Most of those writes are redundant by construction. A writer re-reading a
+  // paragraph, thinking (the deliberate pauses the integrity score exists to
+  // recognise), or sitting with the tab open re-serializes a byte-identical
+  // snapshot every three seconds indefinitely. Skipping those costs one length
+  // comparison and two string comparisons per tick.
+  //
+  // Events are only ever appended to `eventsRef.current`, never removed or
+  // rewritten, so the count is a sound change signal for the trace; a
+  // `paste_blocked` (which pushes an event without altering the content) is
+  // caught by it as well as by `blockedPasteCount`. `null` until the first
+  // persist, so the first tick after mount always writes — that write is what
+  // refreshes `savedAt` and so extends a resumed draft's 24h window, which
+  // `formatDraftExpiry()` documents as the behaviour of simply opening a draft
+  // again.
+  const lastPersistedRef = useRef<{
+    title: string;
+    content: string;
+    blockedPasteCount: number;
+    eventCount: number;
+  } | null>(null);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -563,6 +593,17 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
       if (draftFinalizedRef.current) return;
       const { title: t, content: c, blockedPasteCount: b } = draftSnapshotRef.current;
       if (!c.trim() && !t.trim()) return;
+      const eventCount = eventsRef.current.length;
+      const last = lastPersistedRef.current;
+      if (
+        last &&
+        last.eventCount === eventCount &&
+        last.blockedPasteCount === b &&
+        last.title === t &&
+        last.content === c
+      ) {
+        return;
+      }
       const snapshot: DraftSnapshot = {
         sessionId,
         title: t,
@@ -577,6 +618,10 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
       };
       try {
         window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
+        // Only after the write actually lands: a quota failure must leave the
+        // next tick free to retry rather than record a snapshot that isn't
+        // there.
+        lastPersistedRef.current = { title: t, content: c, blockedPasteCount: b, eventCount };
       } catch {
         // Quota exceeded or storage disabled — silently skip.
       }
