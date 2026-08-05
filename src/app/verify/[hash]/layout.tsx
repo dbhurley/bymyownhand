@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { getDocumentByHash } from '@/lib/db';
+import { getDocumentTitleByHash } from '@/lib/db';
 import { isValidVerificationHash } from '@/lib/hash';
 import { ogShareImages, twitterShareImages } from '@/lib/share';
 
@@ -54,9 +54,16 @@ export async function generateMetadata({ params }: { params: Promise<{ hash: str
 
   let docTitle: string | null = null;
   try {
-    const doc = await getDocumentByHash(hash);
-    if (doc && typeof doc.title === 'string' && doc.title.trim()) {
-      docTitle = doc.title.trim();
+    // The *title* projection, not the whole row. This lookup runs on every
+    // request to a proof page (the route is server-rendered on demand), and the
+    // `SELECT *` it used to make dragged the full `content` and the
+    // `keystroke_data` JSONB — megabytes on a long piece — from Neon so this
+    // block could read one short string off it. Every scraper unfurl of a shared
+    // link paid for a keystroke trace nothing here ever looks at. See
+    // `getDocumentTitleByHash()`.
+    const title = await getDocumentTitleByHash(hash);
+    if (title && title.trim()) {
+      docTitle = title.trim();
     }
   } catch {
     // No DB / lookup failure — fall through to the generic share card.

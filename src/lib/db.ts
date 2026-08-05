@@ -130,6 +130,34 @@ export async function getDocumentByHash(hash: string) {
   return results[0] || null;
 }
 
+// The document's title alone, for callers that need nothing else.
+//
+// `getDocumentByHash()` is a `SELECT *`, and the widest column it returns is the
+// `keystroke_data` JSONB — up to the route's 250k-event cap, so megabytes on a
+// long piece — followed by the full `content`. `/verify/<hash>`'s
+// `generateMetadata` was reading exactly one ~40-character string out of that
+// row (the title for the OG/Twitter share card) and discarding the rest. The
+// route is server-rendered on demand, so the whole trace crossed the wire from
+// Neon on every social-scraper unfurl, every crawler fetch, and every human
+// pageload of a shared proof link — which is precisely the traffic the Phase 1.3
+// embed flywheel exists to create, and the volume it is meant to grow.
+//
+// Same `isValidVerificationHash()` gate as the wide read above: no external
+// roundtrip is spent on input that can't have been minted by us. Returns the raw
+// stored title; the caller decides what an empty one means.
+export async function getDocumentTitleByHash(hash: string): Promise<string | null> {
+  const sql = getSql();
+  if (!sql) return null;
+
+  if (!isValidVerificationHash(hash)) return null;
+
+  const results = await sql`
+    SELECT title FROM documents WHERE verification_hash = ${hash}
+  `;
+  const title = results[0]?.title;
+  return typeof title === 'string' ? title : null;
+}
+
 // Helper to create document. Note: the integrity score is derived from the
 // keystroke trace at read time (see lib/metrics.calculateIntegrityScore + the
 // /verify/<hash> page), not persisted to its own column — the trace is the

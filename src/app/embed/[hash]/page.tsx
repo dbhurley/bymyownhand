@@ -33,6 +33,31 @@ import {
 // headers in `next.config.ts` are scoped to `/write` and `/success/*`, the
 // input-capturing surfaces that must never be framed. This route is the
 // opposite — it exists to be framed by third parties.
+// Cache the fragment. What this route renders is decided entirely by the
+// *format* of the hash in the URL — a well-formed one gets the pill, anything
+// else gets nothing — so the output for a given URL never changes, and there is
+// no per-request state to read. It was nonetheless rendered on demand on every
+// request, while its `/embed.js` twin (which renders the same badge from the
+// same constants) is static and cached for a day at the edge.
+//
+// That asymmetry lands on the worst surface to have it: this route is fetched by
+// every *reader* of every page carrying an iframe badge, which is exactly the
+// volume the Phase 1.3 flywheel is built to grow — so the badge that succeeds
+// most is the one that costs most. Serving it from the ISR cache makes the two
+// served variants behave alike; the `revalidate` window is the same day
+// `/embed.js` advertises, so a change to the shared badge definition still
+// reaches embeds in the wild on the same schedule.
+//
+// `generateStaticParams` returning nothing is the deliberate "no prebuilt paths,
+// cache on first request" shape: there is no build-time list of hashes to
+// enumerate, and `dynamicParams` (default `true`) admits every hash the writers
+// actually minted.
+export const revalidate = 86400;
+
+export async function generateStaticParams() {
+  return [];
+}
+
 export const metadata: Metadata = {
   // A badge fragment is not a page: it has no prose, and indexing it would put
   // a chromeless duplicate of the proof link in front of searchers instead of
