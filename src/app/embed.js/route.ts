@@ -3,9 +3,9 @@ import {
   BADGE_LABEL,
   BADGE_LINK_TITLE,
   BADGE_MARK_CSS,
-  BADGE_MARK_PATH,
   BADGE_MARK_SIZE,
   BADGE_PILL_CSS,
+  BADGE_PILL_MARK_PATH,
 } from '@/lib/embed';
 
 // The Phase 1.3 one-line embed:
@@ -64,7 +64,7 @@ function buildScript(siteUrl: string): string {
   a.style.cssText = ${JSON.stringify(BADGE_PILL_CSS)};
 
   var img = document.createElement('img');
-  img.src = base + ${JSON.stringify(BADGE_MARK_PATH)};
+  img.src = base + ${JSON.stringify(BADGE_PILL_MARK_PATH)};
   // Decorative: the words beside it carry the meaning, so it stays out of the
   // host page's accessibility tree.
   img.alt = '';

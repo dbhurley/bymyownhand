@@ -46,9 +46,28 @@ export const BADGE_LABEL = 'Verified human-written';
 export const BADGE_LINK_TITLE = 'Verify this document on By My Own Hand';
 
 // Raster, not `/logo.svg` — see the note above on why the embed surfaces are
-// the least SVG-friendly places we ship to. Also the logo used by the Markdown
-// and HTML snippets below, so all four formats show one mark.
+// the least SVG-friendly places we ship to. The Markdown and HTML snippets
+// render this at `width=120`, so the 192px app icon is the right source for
+// them.
 export const BADGE_MARK_PATH = '/icon-192x192.png';
+
+// The mark for the two *served* variants (`/embed.js` and `/embed/<hash>`),
+// which draw it at 22 CSS pixels inside the pill.
+//
+// They used to point at `BADGE_MARK_PATH` as well — a **49 KB, 192×192** PNG,
+// fetched to paint a 22-pixel square. That is a ~50× oversample, and it is paid
+// by every reader of every page carrying a badge, on someone else's page and
+// over their connection: the pill's own markup is a few hundred bytes, so the
+// mark *was* the badge's weight, and the cost grew with exactly the adoption the
+// flywheel exists to create. Same "what does this cost when it works?" shape as
+// the app shell this route no longer ships (see `app/embed/[hash]/route.ts`).
+//
+// 44px is 2× the rendered size, so the mark stays crisp on a retina display, and
+// it is a straight downsample of the same icon — visually identical at 22px, at
+// 2,696 bytes instead of 49,088. Deliberately a separate constant rather than a
+// replacement: the copied Markdown/HTML snippets show the mark at 120px, where
+// downsampling the source would be a visible regression.
+export const BADGE_PILL_MARK_PATH = '/badge-mark-44x44.png';
 export const BADGE_MARK_SIZE = 22;
 
 // Inline CSS rather than a class: the script variant sets `style.cssText` on a
