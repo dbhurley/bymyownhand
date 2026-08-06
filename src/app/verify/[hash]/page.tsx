@@ -12,6 +12,12 @@ import { writeClipboard } from '@/lib/clipboard';
 import { WritingAnalysis } from '@/components/WritingAnalysis';
 import { XIcon, LinkedInIcon } from '@/components/ShareIcons';
 
+// 'notfound' — the hash is malformed, or the service answered and has no such
+// document. 'unavailable' — the service could not answer (a `503` from the API's
+// database branch, or a failed fetch). The second must never be presented as the
+// first: the document may be perfectly fine.
+type LoadError = 'notfound' | 'unavailable';
+
 interface DocumentData {
   id: string;
   title: string;
@@ -32,7 +38,17 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   const { hash } = use(params);
   const [document, setDocument] = useState<DocumentData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // *Which* failure, not just that there was one. A missing document and an
+  // unreachable verification service are different claims about the same URL,
+  // and rendering "this link is invalid or the document has been removed" for
+  // the second is a lie about someone's certified work — see the `503` branch in
+  // `GET /api/documents/[hash]`. `'unavailable'` also covers the client-side
+  // failures with the same character: an offline reader, a dropped fetch.
+  const [error, setError] = useState<LoadError | null>(null);
+  // Bumped by the retry button on the `'unavailable'` state, which re-runs the
+  // load effect. A transient failure deserves a retry that costs the reader one
+  // click rather than a full page reload.
+  const [attempt, setAttempt] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackText, setPlaybackText] = useState('');
   const [playbackProgress, setPlaybackProgress] = useState(0);
@@ -49,10 +65,13 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
     // writer's own just-certified fast-path is unaffected. Trust-boundary
     // parity with the server, applied at the client edge.
     if (!isValidVerificationHash(hash)) {
-      setError('Document not found');
+      setError('notfound');
       setLoading(false);
       return;
     }
+
+    setLoading(true);
+    setError(null);
 
     const stored = sessionStorage.getItem('lastSession');
     if (stored) {
@@ -97,21 +116,32 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
       }
     }
 
+    let cancelled = false;
     fetch(`/api/documents/${hash}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.error) {
-          setError(data.error);
-        } else {
+      .then(async res => {
+        // Read the outcome from the *status*, not from the presence of an
+        // `error` string: a `503` and a `404` both carry one, and only the
+        // second means "there is no such document."
+        const data = await res.json().catch(() => null);
+        if (cancelled) return;
+        if (res.ok && data?.document) {
           setDocument(data.document);
+        } else {
+          setError(res.status === 404 ? 'notfound' : 'unavailable');
         }
         setLoading(false);
       })
       .catch(() => {
-        setError('Failed to load document');
+        // A failed fetch (offline, DNS, a dropped connection) says nothing
+        // about whether the document exists — same reasoning as the `503`.
+        if (cancelled) return;
+        setError('unavailable');
         setLoading(false);
       });
-  }, [hash]);
+    return () => {
+      cancelled = true;
+    };
+  }, [hash, attempt]);
 
   const startPlayback = () => {
     if (!document?.keystrokeData?.events) return;
@@ -231,6 +261,12 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   }
 
   if (error || !document) {
+    // Say which of the two things happened. Declaring a real proof invalid
+    // because our own database blinked is the most damaging sentence this page
+    // could print — the link may be in someone's byline, an email signature, or
+    // an embed badge on a page we will never see, and the reader has no way to
+    // tell a service outage from a fabricated certification.
+    const unavailable = error === 'unavailable';
     return (
       <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
         <header className="flex items-center px-6 md:px-8 py-6 border-b border-deep-blue/[0.06]">
@@ -242,23 +278,46 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
         </header>
         <main className="max-w-2xl mx-auto px-6 md:px-8 py-16 text-center">
           <div className="w-14 h-14 rounded-full bg-deep-blue/5 flex items-center justify-center mx-auto mb-6">
-            {/* Decorative — the "Document Not Found" heading below carries the
-                meaning. Hidden from the a11y tree like the sibling spinner and
-                chevron icons on this page. */}
+            {/* Decorative — the heading below carries the meaning. Hidden from
+                the a11y tree like the sibling spinner and chevron icons on this
+                page. The unavailable case gets a neutral dash rather than the
+                cross: an outage is indeterminate, not a verdict. */}
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-deep-blue/30" aria-hidden="true">
-              <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              {unavailable ? (
+                <path d="M6 12H18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              ) : (
+                <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              )}
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-deep-blue mb-2 tracking-tight">Document Not Found</h1>
+          <h1 className="text-2xl font-bold text-deep-blue mb-2 tracking-tight">
+            {unavailable ? 'Verification Temporarily Unavailable' : 'Document Not Found'}
+          </h1>
           <p className="text-deep-blue/50 mb-8">
-            This verification link is invalid or the document has been removed.
+            {unavailable
+              ? 'We could not reach the verification service just now. This is not a judgement on the document — the link is unchanged, so please try again in a moment.'
+              : 'This verification link is invalid or the document has been removed.'}
           </p>
-          <Link
-            href="/"
-            className="inline-flex px-6 py-3 bg-deep-blue text-cream rounded-full font-medium text-sm hover:bg-deep-blue/90 transition-colors"
-          >
-            Go Home
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            {unavailable && (
+              <button
+                onClick={() => setAttempt(n => n + 1)}
+                className="inline-flex justify-center px-6 py-3 bg-deep-blue text-cream rounded-full font-medium text-sm hover:bg-deep-blue/90 transition-colors"
+              >
+                Try again
+              </button>
+            )}
+            <Link
+              href="/"
+              className={`inline-flex justify-center px-6 py-3 rounded-full font-medium text-sm transition-colors ${
+                unavailable
+                  ? 'border border-deep-blue/15 text-deep-blue hover:bg-deep-blue/5'
+                  : 'bg-deep-blue text-cream hover:bg-deep-blue/90'
+              }`}
+            >
+              Go Home
+            </Link>
+          </div>
         </main>
       </div>
     );
