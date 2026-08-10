@@ -2,7 +2,7 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
-import type { KeystrokeEvent, WritingSession } from '@/lib/types';
+import { MAX_DOCUMENT_TITLE_LENGTH, type KeystrokeEvent, type WritingSession } from '@/lib/types';
 import { calculateMetrics, calculateIntegrityScore, countWords, formatDuration } from '@/lib/metrics';
 import { clearDraft, DRAFT_STORAGE_KEY, type DraftSnapshot } from '@/lib/draft';
 import { nanoid } from 'nanoid';
@@ -720,6 +720,12 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
             placeholder="Untitled Document"
+            // Match the API's canonical title cap at the point of entry. Before
+            // this, the editor accepted an arbitrarily long title while the
+            // server silently stored only the first 200 characters, so the
+            // success page/share copy could describe a different title from
+            // the durable verification page and certificate.
+            maxLength={MAX_DOCUMENT_TITLE_LENGTH}
             // A `placeholder` is not a reliable accessible name: it disappears
             // once the field has a value and isn't consistently announced as a
             // label. Without `aria-label` this is an unlabeled edit field — the

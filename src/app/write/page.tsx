@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import type { WritingSession } from '@/lib/types';
+import { MAX_DOCUMENT_TITLE_LENGTH, type WritingSession } from '@/lib/types';
 import { clearDraft, formatDraftAge, formatDraftExpiry, loadDraft, type DraftSnapshot } from '@/lib/draft';
 import { countWords } from '@/lib/metrics';
 import { getStreakSummary, recordCertification, type StreakSummary } from '@/lib/history';
@@ -51,7 +51,10 @@ export default function WritePage() {
     const existing = loadDraft();
     if (existing) {
       setDraft(existing);
-      setTitle(existing.title);
+      // Older/tampered drafts can predate the shared title cap. Normalize on
+      // restore too, otherwise a controlled input can begin over maxLength and
+      // the success page can still diverge from the server's stored title.
+      setTitle(existing.title.slice(0, MAX_DOCUMENT_TITLE_LENGTH));
       // The resume banner is an interstitial that gates the editor to ask a
       // question — "do you want your earlier work back?" — and that question
       // only means anything when there *is* earlier work. The autosave persists
@@ -96,11 +99,16 @@ export default function WritePage() {
     setError(null);
 
     try {
+      // Send and retain exactly the title the server will persist. Previously
+      // the server trimmed/capped independently while sessionStorage and the
+      // local proof history kept the raw client title, producing two names for
+      // one proof until the writer reached the durable /verify page.
+      const certifiedTitle = title.trim().slice(0, MAX_DOCUMENT_TITLE_LENGTH) || 'Untitled Document';
       const response = await fetch('/api/documents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: title || 'Untitled Document',
+          title: certifiedTitle,
           session,
         }),
       });
@@ -112,8 +120,6 @@ export default function WritePage() {
       }
 
       const hash = data.verificationHash;
-      const certifiedTitle = title || 'Untitled Document';
-
       // The document is already certified server-side by the time we get here,
       // so nothing below is allowed to report the certification as a failure.
       // `sessionStorage.setItem` can throw: the payload carries the whole

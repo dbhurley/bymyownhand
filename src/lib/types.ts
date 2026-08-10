@@ -1,3 +1,7 @@
+// Keep the editor and API on one title contract. The value is exported from
+// this shared, dependency-free module so client and server code cannot drift.
+export const MAX_DOCUMENT_TITLE_LENGTH = 200;
+
 export interface KeystrokeEvent {
   t: number; // timestamp in ms from session start
   type: 'key' | 'delete' | 'paste_blocked' | 'paste_internal';

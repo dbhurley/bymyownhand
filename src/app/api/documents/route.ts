@@ -4,7 +4,7 @@ import { generateVerificationHash } from '@/lib/hash';
 import { createDocument } from '@/lib/db';
 import { getCanonicalVerifyUrl } from '@/lib/site';
 import { countWords, calculateMetrics, getSessionWritingTime, isValidKeystrokeEvent } from '@/lib/metrics';
-import type { WritingSession } from '@/lib/types';
+import { MAX_DOCUMENT_TITLE_LENGTH, type WritingSession } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     // reasonable length so a maliciously long title can't blow up the
     // record. Trust-boundary fix paralleling the server-computed `wordCount`
     // in §6.15 — the server is the canonical source for what it admits.
-    const normalizedTitle = title.trim().slice(0, 200) || 'Untitled Document';
+    const normalizedTitle = title.trim().slice(0, MAX_DOCUMENT_TITLE_LENGTH) || 'Untitled Document';
 
     // Cap the raw content length, completing the trust-boundary series that
     // already bounds the title (200 chars) and the keystroke trace (250k

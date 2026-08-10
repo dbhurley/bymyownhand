@@ -104,7 +104,13 @@ export function recordCertification(record: CertificationRecord): StreakSummary 
   if (!history.some(r => r.hash === record.hash)) {
     const title = record.title?.trim().slice(0, MAX_TITLE_LENGTH);
     history.push({ ...record, title: title || undefined });
-    writeHistory(history);
+    // Summarize the same capped collection that actually landed in storage.
+    // At entry 501 the previous code persisted only the newest 500 but returned
+    // `total: 501`, so the success pill and "showing N of M" copy overstated
+    // the writer's recoverable proof history until the next page load.
+    const persistedHistory = history.slice(-MAX_ENTRIES);
+    writeHistory(persistedHistory);
+    return summarize(persistedHistory);
   }
   return summarize(history);
 }

@@ -37,34 +37,40 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
   const [recentProofs, setRecentProofs] = useState<CertificationRecord[]>([]);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem('lastSession');
+    // sessionStorage is an external browser system. Reconcile it from a timer
+    // callback after the effect has subscribed rather than synchronously
+    // cascading four state updates from the effect body; this keeps the
+    // success handoff one paint after hydration and satisfies React's effect
+    // contract without changing the cold-visit redirect behavior.
+    const reconcileSession = window.setTimeout(() => {
+      const stored = sessionStorage.getItem('lastSession');
     // Cold visits to /success/<hash> (a bookmark, a refresh after sessionStorage
     // expired) used to render a placeholder card showing "0 words / 0s / 0 Low"
     // for the user's own document — confusing, and incorrectly suggests a fresh
     // certification was just made. Hand off to /verify/<hash> instead, which
     // can fetch from the DB or fail clearly when neither source has the doc.
-    if (!stored) {
-      router.replace(`/verify/${hash}`);
-      return;
-    }
+      if (!stored) {
+        router.replace(`/verify/${hash}`);
+        return;
+      }
     // Treat the sessionStorage payload as untrusted: a corrupted or partially-
     // written value would otherwise throw an uncaught JSON.parse error inside
     // this effect, leaving the writer staring at a blank screen with no path
     // forward. Same trust-boundary principle as the strict draft-schema check
     // in `lib/draft.ts` and the strict numeric filter in `lib/history.ts` —
     // fall back to `/verify/<hash>` rather than half-restore a broken record.
-    let parsed: SessionData | null = null;
-    try {
-      parsed = JSON.parse(stored) as SessionData;
-    } catch {
-      router.replace(`/verify/${hash}`);
-      return;
-    }
-    if (!parsed || parsed.verificationHash !== hash) {
-      router.replace(`/verify/${hash}`);
-      return;
-    }
-    setSession(parsed);
+      let parsed: SessionData | null = null;
+      try {
+        parsed = JSON.parse(stored) as SessionData;
+      } catch {
+        router.replace(`/verify/${hash}`);
+        return;
+      }
+      if (!parsed || parsed.verificationHash !== hash) {
+        router.replace(`/verify/${hash}`);
+        return;
+      }
+      setSession(parsed);
     // Record this certification once (idempotent on hash) and surface the
     // resulting streak/total so the writer sees their habit forming.
     //
@@ -76,18 +82,21 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
     // start across a gap of up to 24h, a draft begun yesterday but certified
     // today would otherwise record yesterday's `dayKey()` and attribute today's
     // certification to the wrong day (breaking the streak or under-counting it).
-    const summary = recordCertification({
-      hash: parsed.verificationHash,
-      certifiedAt: Date.now(),
-      wordCount: parsed.wordCount || 0,
-      integrityScore: parsed.integrityScore || 0,
-      title: parsed.title,
-    });
-    setStreakSummary(summary);
+      const summary = recordCertification({
+        hash: parsed.verificationHash,
+        certifiedAt: Date.now(),
+        wordCount: parsed.wordCount || 0,
+        integrityScore: parsed.integrityScore || 0,
+        title: parsed.title,
+      });
+      setStreakSummary(summary);
     // Read the recall list *after* recording, and exclude the piece this page
     // is already about, so the list is strictly "everything else you've
     // certified on this device."
-    setRecentProofs(getRecentCertifications(5, parsed.verificationHash));
+      setRecentProofs(getRecentCertifications(5, parsed.verificationHash));
+    }, 0);
+
+    return () => window.clearTimeout(reconcileSession);
   }, [hash, router]);
 
   const verifyUrl = buildVerifyUrl(hash);
