@@ -99,7 +99,15 @@ export function calculateMetrics(events: KeystrokeEvent[], content = ''): Writin
   const variance = intervals.length > 0
     ? intervals.reduce((sum, val) => sum + Math.pow(val - avgKeystrokeInterval, 2), 0) / intervals.length
     : 0;
-  const keystrokeVariance = Math.sqrt(variance) / (avgKeystrokeInterval || 1);
+  // Coefficient of variation is a magnitude and must not become negative.
+  // `isValidKeystrokeEvent()` deliberately permits a negative timestamp when a
+  // device clock is corrected backwards mid-session; enough skew can make the
+  // mean interval negative even though the standard deviation is positive. The
+  // former signed denominator then produced a negative CoV, automatically
+  // tripping the `< 0.1` robotic-rhythm penalty and failing the browser-handoff
+  // schema for an otherwise valid session. Preserve the skewed timing evidence,
+  // but divide by the mean's magnitude so the metric keeps its defined range.
+  const keystrokeVariance = Math.sqrt(variance) / (Math.abs(avgKeystrokeInterval) || 1);
   
   // Count pauses (intervals > 2000ms)
   const pauseCount = intervals.filter(i => i > 2000).length;

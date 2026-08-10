@@ -8,6 +8,7 @@ import { MAX_DOCUMENT_TITLE_LENGTH, type WritingSession } from '@/lib/types';
 import { clearDraft, formatDraftAge, formatDraftExpiry, loadDraft, type DraftSnapshot } from '@/lib/draft';
 import { countWords } from '@/lib/metrics';
 import { getStreakSummary, recordCertification, type StreakSummary } from '@/lib/history';
+import { writeSessionHandoff } from '@/lib/sessionHandoff';
 import {
   breadcrumbListJsonLd,
   faqPageJsonLd,
@@ -130,14 +131,18 @@ export default function WritePage() {
       // draft kept, and *no proof link at all* for a document that had just
       // been certified. Pressing Complete again then minted a second hash for
       // the same piece.
-      try {
-        sessionStorage.setItem('lastSession', JSON.stringify({
-          ...session,
-          verificationHash: hash,
-          documentId: data.documentId,
-          title: certifiedTitle,
-        }));
-      } catch {
+      if (!writeSessionHandoff({
+        ...session,
+        verificationHash: hash,
+        documentId: data.documentId,
+        title: certifiedTitle,
+        // These fields are always present on an editor-minted session. Making
+        // that runtime contract explicit here lets the shared handoff validator
+        // protect both destination pages from partial browser storage.
+        endedAt: session.endedAt!,
+        metrics: session.metrics!,
+        integrityScore: session.integrityScore!,
+      })) {
         // Without the handoff payload `/success/<hash>` has nothing to render
         // and redirects to `/verify/<hash>` on its own, so go straight there.
         // Record the certification here too: `/success` is what normally writes

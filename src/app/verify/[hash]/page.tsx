@@ -11,6 +11,7 @@ import { buildLinkedInShareUrl, buildTweetUrl } from '@/lib/share';
 import { writeClipboard } from '@/lib/clipboard';
 import { WritingAnalysis } from '@/components/WritingAnalysis';
 import { XIcon, LinkedInIcon } from '@/components/ShareIcons';
+import { readSessionHandoff } from '@/lib/sessionHandoff';
 
 // 'notfound' — the hash is malformed, or the service answered and has no such
 // document. 'unavailable' — the service could not answer (a `503` from the API's
@@ -73,47 +74,25 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
     setLoading(true);
     setError(null);
 
-    const stored = sessionStorage.getItem('lastSession');
-    if (stored) {
-      try {
-        const session = JSON.parse(stored);
-        // Only take the sessionStorage fast-path when the payload is for this
-        // hash *and* carries the fields the page reads. A corrupt or partial
-        // `lastSession` (a quota-exceeded write, a tab killed mid-setItem, a
-        // manually-edited value) used to slip through on a hash match alone,
-        // then throw a RangeError at `new Date(session.startedAt).toISOString()`
-        // for a non-finite `startedAt` — silently dropping the writer to the
-        // API path, which on the no-DB MVP flow returns 404 for their own
-        // freshly-certified document. Validate first; fall through to the API
-        // on any mismatch. Same trust-boundary principle as the strict parse
-        // on /success (§6.24) and the strict draft/history schema checks.
-        if (
-          session?.verificationHash === hash &&
-          typeof session.content === 'string' &&
-          typeof session.startedAt === 'number' &&
-          Number.isFinite(session.startedAt)
-        ) {
-          setDocument({
-            id: session.documentId,
-            title: session.title,
-            content: session.content,
-            wordCount: session.wordCount,
-            writingTimeMs: getSessionWritingTime(session),
-            verificationHash: hash,
-            status: 'certified',
-            createdAt: new Date(session.startedAt).toISOString(),
-            certifiedAt: new Date().toISOString(),
-            keystrokeData: {
-              events: session.events,
-              metrics: session.metrics,
-            },
-          });
-          setLoading(false);
-          return;
-        }
-      } catch (e) {
-        console.error('Error parsing session:', e);
-      }
+    const session = readSessionHandoff(hash);
+    if (session) {
+      setDocument({
+        id: session.documentId,
+        title: session.title,
+        content: session.content,
+        wordCount: session.wordCount,
+        writingTimeMs: getSessionWritingTime(session),
+        verificationHash: hash,
+        status: 'certified',
+        createdAt: new Date(session.startedAt).toISOString(),
+        certifiedAt: new Date().toISOString(),
+        keystrokeData: {
+          events: session.events,
+          metrics: session.metrics,
+        },
+      });
+      setLoading(false);
+      return;
     }
 
     let cancelled = false;
@@ -690,4 +669,3 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
     </div>
   );
 }
-

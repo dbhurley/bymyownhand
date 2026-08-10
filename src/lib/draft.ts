@@ -1,4 +1,5 @@
 import type { KeystrokeEvent } from './types';
+import { isValidKeystrokeEvent } from './metrics';
 
 export const DRAFT_STORAGE_KEY = 'bmoh:draft:v1';
 
@@ -49,15 +50,21 @@ function isValidDraftSnapshot(value: unknown): value is DraftSnapshot {
   const v = value as Record<string, unknown>;
   return (
     typeof v.sessionId === 'string' &&
+    v.sessionId.length > 0 &&
     typeof v.title === 'string' &&
     typeof v.content === 'string' &&
     Array.isArray(v.events) &&
+    v.events.every(isValidKeystrokeEvent) &&
     typeof v.startTime === 'number' &&
     Number.isFinite(v.startTime) &&
+    v.startTime > 0 &&
     typeof v.blockedPasteCount === 'number' &&
     Number.isFinite(v.blockedPasteCount) &&
+    Number.isInteger(v.blockedPasteCount) &&
+    v.blockedPasteCount >= 0 &&
     typeof v.savedAt === 'number' &&
-    Number.isFinite(v.savedAt)
+    Number.isFinite(v.savedAt) &&
+    v.savedAt > 0
   );
 }
 

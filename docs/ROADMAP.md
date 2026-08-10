@@ -1,6 +1,6 @@
 # By My Own Hand — Roadmap
 
-> **Last updated:** 2026-08-09
+> **Last updated:** 2026-08-10
 > Companion to [PRD.md](PRD.md). Items are grouped by phase, not by date — phase boundaries shift with traction signals.
 
 The North Star: **make the act of writing — verifiably and beautifully human — a daily ritual that writers proudly share.**
@@ -57,7 +57,14 @@ The North Star: **make the act of writing — verifiably and beautifully human �
 - ✅ **Shared `buildEmbedSnippets(verifyUrl)` helper in `lib/embed.ts`** — the markdown + HTML embed snippets and the aspect-ratio comment lived inline in both `success/[hash]` and `verify/[hash]`. The snippet generator now lives in one helper (parallels the prior `getScoreLabel` / `getSiteUrl` consolidations), so a tweak — alt-text wording, query-string tracking, v2 logo URL — only has to land once. Drift-prevention before the `embed.js` and `iframe` variants land.
 - ✅ **Defensive blog-date handling in sitemap + JSON Feed** — posts with a missing or unparseable `date` used to leak into the sitemap with `lastModified=now` (the freshness lie this prior revision had just fixed for `/blog`) and into the JSON Feed with a literal `"T00:00:00Z"` `date_published` (which most feed validators reject). Both routes now skip such entries rather than emit a misleading one — protecting discovery surface against a future post landing without a frontmatter date.
 
-### Title identity + durable-history + success-handoff polish (this revision)
+### Browser-persistence trust-boundary polish (this revision)
+- ✅ **One strict success-handoff schema** — `/success/<hash>` and `/verify/<hash>` now read the same `SessionHandoff` contract instead of two partial validators. IDs, hash, title/content, timing, canonical word count, score, metrics, and every trace event must all be valid before browser storage is rendered or replayed.
+- ✅ **Storage-denial-safe handoff helpers** — browser privacy settings can make `sessionStorage.getItem()` throw, not only `setItem()`. Shared read/write helpers catch access, quota, parse, and validation failures so the writer follows the durable `/verify` fallback instead of being stranded after certification.
+- ✅ **Draft traces validated before resume** — `loadDraft()` now checks every stored event through the API's canonical keystroke-event predicate and tightens the session/timestamp/blocked-paste invariants. Corrupt local state is pruned before it can poison the retained writing session.
+- ✅ **Timing variance stays non-negative across clock corrections** — the event contract intentionally permits a device clock moving backwards, but the coefficient-of-variation calculation divided by a signed mean interval. It now uses the mean's magnitude, avoiding a false robotic-rhythm penalty and keeping valid sessions inside the shared handoff schema.
+- ✅ **One title limit in proof history too** — the local recall store dropped its duplicate `200` literal and imports `MAX_DOCUMENT_TITLE_LENGTH`; recalled titles cannot drift from the editor/API title policy on a future change.
+
+### Title identity + durable-history + success-handoff polish (prior revision)
 - ✅ **One title contract across the writer's whole proof** — the editor now shares the API's 200-character limit, normalizes the title before both certification and the local success handoff, and caps restored legacy drafts. `/success`, share copy, history, the certificate, and `/verify` can no longer show two titles for one document.
 - ✅ **The 500-proof local-history cap is reflected immediately** — `recordCertification()` now computes the returned total/streak from the same capped collection it persists, so certification 501 does not claim one more recoverable proof than the device actually kept.
 - ✅ **The success-page handoff is lint-clean** — `sessionStorage` reconciliation moved out of the synchronous effect body into a cancellable post-effect callback. Warm sessions and cold redirects are unchanged, and the pre-existing `react-hooks/set-state-in-effect` error is gone; lint now completes with warnings only.

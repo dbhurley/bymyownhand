@@ -4,7 +4,6 @@ import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import type { WritingSession } from '@/lib/types';
 import { computeWpm, formatDuration, getScoreLabel, getSessionWritingTime } from '@/lib/metrics';
 import { buildEmbedSnippets, EMBED_FORMATS, type EmbedFormat } from '@/lib/embed';
 import { getRecentCertifications, recordCertification, type CertificationRecord, type StreakSummary } from '@/lib/history';
@@ -14,22 +13,17 @@ import { writeClipboard } from '@/lib/clipboard';
 import { WritingAnalysis } from '@/components/WritingAnalysis';
 import { ProofList } from '@/components/ProofList';
 import { XIcon, LinkedInIcon } from '@/components/ShareIcons';
+import { readSessionHandoff, type SessionHandoff } from '@/lib/sessionHandoff';
 
 const DownloadCertificate = dynamic(
   () => import('@/components/DownloadCertificate').then(mod => mod.DownloadCertificate),
   { ssr: false, loading: () => <div className="h-12 w-48 bg-deep-blue/5 rounded-full animate-pulse" /> }
 );
 
-interface SessionData extends WritingSession {
-  verificationHash: string;
-  documentId: string;
-  title: string;
-}
-
 export default function SuccessPage({ params }: { params: Promise<{ hash: string }> }) {
   const { hash } = use(params);
   const router = useRouter();
-  const [session, setSession] = useState<SessionData | null>(null);
+  const [session, setSession] = useState<SessionHandoff | null>(null);
   const [copied, setCopied] = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
   const [embedFormat, setEmbedFormat] = useState<EmbedFormat>('markdown');
@@ -43,30 +37,13 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
     // success handoff one paint after hydration and satisfies React's effect
     // contract without changing the cold-visit redirect behavior.
     const reconcileSession = window.setTimeout(() => {
-      const stored = sessionStorage.getItem('lastSession');
+      const parsed = readSessionHandoff(hash);
     // Cold visits to /success/<hash> (a bookmark, a refresh after sessionStorage
     // expired) used to render a placeholder card showing "0 words / 0s / 0 Low"
     // for the user's own document — confusing, and incorrectly suggests a fresh
     // certification was just made. Hand off to /verify/<hash> instead, which
     // can fetch from the DB or fail clearly when neither source has the doc.
-      if (!stored) {
-        router.replace(`/verify/${hash}`);
-        return;
-      }
-    // Treat the sessionStorage payload as untrusted: a corrupted or partially-
-    // written value would otherwise throw an uncaught JSON.parse error inside
-    // this effect, leaving the writer staring at a blank screen with no path
-    // forward. Same trust-boundary principle as the strict draft-schema check
-    // in `lib/draft.ts` and the strict numeric filter in `lib/history.ts` —
-    // fall back to `/verify/<hash>` rather than half-restore a broken record.
-      let parsed: SessionData | null = null;
-      try {
-        parsed = JSON.parse(stored) as SessionData;
-      } catch {
-        router.replace(`/verify/${hash}`);
-        return;
-      }
-      if (!parsed || parsed.verificationHash !== hash) {
+      if (!parsed) {
         router.replace(`/verify/${hash}`);
         return;
       }

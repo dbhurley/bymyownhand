@@ -6,14 +6,10 @@
 // to start the habit-formation feedback loop.
 
 import { isValidVerificationHash } from './hash';
+import { MAX_DOCUMENT_TITLE_LENGTH } from './types';
 
 const HISTORY_STORAGE_KEY = 'bmoh:history:v1';
 const MAX_ENTRIES = 500;
-
-// Titles are capped on write so one pathological entry can't crowd the
-// (finite) localStorage budget the whole history shares. The server already
-// caps a certified title at 200 chars, so this never truncates a real one.
-const MAX_TITLE_LENGTH = 200;
 
 export interface CertificationRecord {
   hash: string;
@@ -102,7 +98,7 @@ export function recordCertification(record: CertificationRecord): StreakSummary 
   const history = readHistory();
   if (!isValidRecord(record)) return summarize(history);
   if (!history.some(r => r.hash === record.hash)) {
-    const title = record.title?.trim().slice(0, MAX_TITLE_LENGTH);
+    const title = record.title?.trim().slice(0, MAX_DOCUMENT_TITLE_LENGTH);
     history.push({ ...record, title: title || undefined });
     // Summarize the same capped collection that actually landed in storage.
     // At entry 501 the previous code persisted only the newest 500 but returned
