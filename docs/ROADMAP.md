@@ -1,6 +1,6 @@
 # By My Own Hand — Roadmap
 
-> **Last updated:** 2026-08-10
+> **Last updated:** 2026-08-11
 > Companion to [PRD.md](PRD.md). Items are grouped by phase, not by date — phase boundaries shift with traction signals.
 
 The North Star: **make the act of writing — verifiably and beautifully human — a daily ritual that writers proudly share.**
@@ -14,7 +14,7 @@ The North Star: **make the act of writing — verifiably and beautifully human �
 - ✅ Verification page with keystroke playback at 3× speed
 - ✅ Shareable `bmoh-xxxx-xxxx-xxxx` proof links
 - ✅ PDF certificate download
-- ✅ Optional Neon Postgres persistence (graceful in-memory fallback)
+- ✅ Optional Neon Postgres persistence for demos; configured production persistence fails certification closed and preserves the draft for retry
 - ✅ 44+ blog posts on identity, AI, content provenance
 - ✅ JSON Feed, llms.txt, humans.txt, Open Graph + Twitter card metadata, canonical URL
 
@@ -57,7 +57,13 @@ The North Star: **make the act of writing — verifiably and beautifully human �
 - ✅ **Shared `buildEmbedSnippets(verifyUrl)` helper in `lib/embed.ts`** — the markdown + HTML embed snippets and the aspect-ratio comment lived inline in both `success/[hash]` and `verify/[hash]`. The snippet generator now lives in one helper (parallels the prior `getScoreLabel` / `getSiteUrl` consolidations), so a tweak — alt-text wording, query-string tracking, v2 logo URL — only has to land once. Drift-prevention before the `embed.js` and `iframe` variants land.
 - ✅ **Defensive blog-date handling in sitemap + JSON Feed** — posts with a missing or unparseable `date` used to leak into the sitemap with `lastModified=now` (the freshness lie this prior revision had just fixed for `/blog`) and into the JSON Feed with a literal `"T00:00:00Z"` `date_published` (which most feed validators reject). Both routes now skip such entries rather than emit a misleading one — protecting discovery surface against a future post landing without a frontmatter date.
 
-### Browser-persistence trust-boundary polish (this revision)
+### Certification-boundary honesty + retry-safety polish (this revision)
+- ✅ **Configured database writes are now part of success** — `POST /api/documents` no longer swallows a failed INSERT and returns a hash that only works in the writer's browser session. With `DATABASE_URL` configured, a failed write returns retryable `503` + `no-store`; the editor reports the temporary failure and keeps the autosaved draft. The intentionally unconfigured MVP demo path remains available.
+- ✅ **Malformed request JSON returns 400** — empty, truncated, invalid, array, and primitive request bodies are classified at the API boundary instead of falling through to a misleading 500. This makes the pre-Phase-2.1 contract actionable for external callers.
+- ✅ **Successful certification responses are validated before navigation** — the editor requires a correctly formatted verification hash and non-empty document ID before writing the browser handoff, routing to success, or allowing the draft to clear. A malformed 2xx can no longer strand the writer at `/success/undefined` and erase recoverable work.
+- ✅ **HTML/empty proxy errors no longer mask their status** — response parsing is defensive, so a non-JSON 502/503 produces a calm status-based retry message instead of a JSON `SyntaxError`; the hash validator now narrows `unknown` directly at this trust boundary.
+
+### Browser-persistence trust-boundary polish (prior revision)
 - ✅ **One strict success-handoff schema** — `/success/<hash>` and `/verify/<hash>` now read the same `SessionHandoff` contract instead of two partial validators. IDs, hash, title/content, timing, canonical word count, score, metrics, and every trace event must all be valid before browser storage is rendered or replayed.
 - ✅ **Storage-denial-safe handoff helpers** — browser privacy settings can make `sessionStorage.getItem()` throw, not only `setItem()`. Shared read/write helpers catch access, quota, parse, and validation failures so the writer follows the durable `/verify` fallback instead of being stranded after certification.
 - ✅ **Draft traces validated before resume** — `loadDraft()` now checks every stored event through the API's canonical keystroke-event predicate and tightens the session/timestamp/blocked-paste invariants. Corrupt local state is pruned before it can poison the retained writing session.

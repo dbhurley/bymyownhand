@@ -8,8 +8,29 @@ import { MAX_DOCUMENT_TITLE_LENGTH, type WritingSession } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { title, session } = body as { title: string; session: WritingSession };
+    // JSON parsing is part of the request trust boundary too. An empty body or
+    // malformed JSON used to throw into the outer catch and return 500, making
+    // a caller mistake its own invalid payload for a service outage. Keep the
+    // route's unexpected-error catch for actual server failures and classify a
+    // syntactically invalid request as the 400 it is.
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Request body must be valid JSON' },
+        { status: 400 }
+      );
+    }
+
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json(
+        { error: 'Request body must be a JSON object' },
+        { status: 400 }
+      );
+    }
+
+    const { title, session: rawSession } = body as Record<string, unknown>;
 
     // Check the *types* of the two string fields, not just their truthiness.
     // The previous `!title || !session || !session.content` gate admitted any
@@ -31,7 +52,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!session || typeof session !== 'object' || typeof session.content !== 'string' || !session.content) {
+    if (!rawSession || typeof rawSession !== 'object' || Array.isArray(rawSession)) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    const session = rawSession as WritingSession;
+    if (typeof session.content !== 'string' || !session.content) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -189,13 +218,23 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    // Try to save to database if configured
+    // A configured database is the durable certification boundary. Swallowing
+    // an INSERT failure and returning success minted a hash that worked only in
+    // the writer's sessionStorage; every person they shared it with then got a
+    // 404. Preserve the no-database MVP path, but when production persistence
+    // is configured, report an unavailable service and let the editor retain
+    // its autosaved draft for a safe retry. Match the read route's retryable
+    // 503/no-store contract so a transient outage is never confused with a
+    // missing proof or cached past recovery.
     if (process.env.DATABASE_URL) {
       try {
         await createDocument(document);
       } catch (dbError) {
         console.error('Database error:', dbError);
-        // Continue without database for MVP
+        return NextResponse.json(
+          { error: 'Certification is temporarily unavailable', retryable: true },
+          { status: 503, headers: { 'Cache-Control': 'no-store' } }
+        );
       }
     }
 

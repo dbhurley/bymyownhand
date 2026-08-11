@@ -8,6 +8,7 @@ import { MAX_DOCUMENT_TITLE_LENGTH, type WritingSession } from '@/lib/types';
 import { clearDraft, formatDraftAge, formatDraftExpiry, loadDraft, type DraftSnapshot } from '@/lib/draft';
 import { countWords } from '@/lib/metrics';
 import { getStreakSummary, recordCertification, type StreakSummary } from '@/lib/history';
+import { isValidVerificationHash } from '@/lib/hash';
 import { writeSessionHandoff } from '@/lib/sessionHandoff';
 import {
   breadcrumbListJsonLd,
@@ -114,13 +115,34 @@ export default function WritePage() {
         }),
       });
 
-      const data = await response.json();
+      // Infrastructure errors do not always arrive as JSON (a proxy may send
+      // an empty or HTML 502/503 body). Parsing such a body used to throw its
+      // own SyntaxError and replace the useful certification failure with an
+      // implementation detail. Treat the body as optional/untrusted and keep a
+      // calm status-based fallback while the editor continues autosaving.
+      const data: unknown = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit document');
+        const message = data && typeof data === 'object' && 'error' in data &&
+          typeof data.error === 'string'
+          ? data.error
+          : `Certification failed (${response.status}). Please try again.`;
+        throw new Error(message);
       }
 
-      const hash = data.verificationHash;
+      // A 2xx status is not enough to clear the only local draft. Validate the
+      // response fields that drive the success route and handoff before treating
+      // the write as certified; otherwise an incomplete proxy/server response
+      // sends the writer to /success/undefined and permanently discards their
+      // recoverable work. This is the response-side twin of the API request
+      // validation below.
+      if (!data || typeof data !== 'object') {
+        throw new Error('Certification response was incomplete. Your draft is still safe — please try again.');
+      }
+      const { verificationHash: hash, documentId } = data as Record<string, unknown>;
+      if (!isValidVerificationHash(hash) || typeof documentId !== 'string' || !documentId) {
+        throw new Error('Certification response was incomplete. Your draft is still safe — please try again.');
+      }
       // The document is already certified server-side by the time we get here,
       // so nothing below is allowed to report the certification as a failure.
       // `sessionStorage.setItem` can throw: the payload carries the whole
@@ -134,7 +156,7 @@ export default function WritePage() {
       if (!writeSessionHandoff({
         ...session,
         verificationHash: hash,
-        documentId: data.documentId,
+        documentId,
         title: certifiedTitle,
         // These fields are always present on an editor-minted session. Making
         // that runtime contract explicit here lets the shared handoff validator
