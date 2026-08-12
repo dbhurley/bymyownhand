@@ -58,7 +58,14 @@ interface ProofsSnapshot {
 
 const EMPTY_SNAPSHOT: ProofsSnapshot = {
   proofs: [],
-  summary: { total: 0, streak: 0, best: 0, certifiedToday: false },
+  summary: {
+    total: 0,
+    streak: 0,
+    best: 0,
+    thisWeek: 0,
+    thisWeekWords: 0,
+    certifiedToday: false,
+  },
 };
 const noopSubscribe = () => () => {};
 
@@ -103,6 +110,22 @@ export function YourProofs() {
           <h2 className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em]">
             Your proofs
           </h2>
+          {/* A local weekly recap is the useful part of the planned Phase 1.4
+              digest before accounts/email exist: it makes accumulated practice
+              visible on the page a returning writer actually visits, without a
+              notification, tracker, or new storage shape. Word volume is used
+              instead of average integrity score so the habit loop rewards
+              showing up and writing, not gaming an advisory score. */}
+          {summary.thisWeek > 0 && (
+            <p className="mt-3 text-sm text-deep-blue/50">
+              This week: <span className="font-semibold text-deep-blue">{summary.thisWeek}</span>{' '}
+              certified piece{summary.thisWeek === 1 ? '' : 's'} ·{' '}
+              <span className="font-semibold text-deep-blue">
+                {summary.thisWeekWords.toLocaleString('en-US')}
+              </span>{' '}
+              word{summary.thisWeekWords === 1 ? '' : 's'}
+            </p>
+          )}
           {/* The Phase 1.4 habit loop, on the surface a returning writer
               actually lands on. The streak already greets them on `/write` (as
               they sit down) and rewards them on `/success/<hash>` (right after
@@ -118,7 +141,7 @@ export function YourProofs() {
               recognition on `/success` so the milestone reads the same wherever
               the writer meets it. */}
           {summary.streak > 1 && (
-            <p className="mt-3 text-sm text-deep-blue/50">
+            <p className={`${summary.thisWeek > 0 ? 'mt-2' : 'mt-3'} text-sm text-deep-blue/50`}>
               <span className="font-semibold text-deep-blue">{summary.streak}</span>-day streak
               {summary.streak === summary.best && (
                 <span className="ml-2 text-[11px] font-medium text-success uppercase tracking-wider">
@@ -169,7 +192,7 @@ export function YourProofs() {
               it, so the count a writer sees always matches what is on the
               device. */}
           {beyondLimit > 0 && `${beyondLimit} older piece${beyondLimit === 1 ? '' : 's'} not shown · `}
-          Kept on this device only — no account needed, nothing uploaded.
+          This proof list is kept on this device — no account needed.
         </p>
       </section>
     </>

@@ -1,6 +1,6 @@
 # By My Own Hand — Roadmap
 
-> **Last updated:** 2026-08-11
+> **Last updated:** 2026-08-12
 > Companion to [PRD.md](PRD.md). Items are grouped by phase, not by date — phase boundaries shift with traction signals.
 
 The North Star: **make the act of writing — verifiably and beautifully human — a daily ritual that writers proudly share.**
@@ -57,7 +57,13 @@ The North Star: **make the act of writing — verifiably and beautifully human �
 - ✅ **Shared `buildEmbedSnippets(verifyUrl)` helper in `lib/embed.ts`** — the markdown + HTML embed snippets and the aspect-ratio comment lived inline in both `success/[hash]` and `verify/[hash]`. The snippet generator now lives in one helper (parallels the prior `getScoreLabel` / `getSiteUrl` consolidations), so a tweak — alt-text wording, query-string tracking, v2 logo URL — only has to land once. Drift-prevention before the `embed.js` and `iframe` variants land.
 - ✅ **Defensive blog-date handling in sitemap + JSON Feed** — posts with a missing or unparseable `date` used to leak into the sitemap with `lastModified=now` (the freshness lie this prior revision had just fixed for `/blog`) and into the JSON Feed with a literal `"T00:00:00Z"` `date_published` (which most feed validators reject). Both routes now skip such entries rather than emit a misleading one — protecting discovery surface against a future post landing without a frontmatter date.
 
-### Certification-boundary honesty + retry-safety polish (this revision)
+### Weekly-progress + local-history honesty polish (this revision)
+- ✅ **Local weekly writing recap** — the landing-page proof section now reports certifications and words since local Monday, and the `/success` reward pill reports this week’s piece count. It is the privacy-preserving core of the planned Phase 1.4 digest before accounts/email exist, and deliberately rewards writing volume rather than asking writers to optimize an advisory integrity score.
+- ✅ **At-risk streak prompt in the editor** — `/write` now distinguishes a streak already secured today from one anchored on yesterday; the latter adds *“finish today”* at desktop widths and carries the full prompt in its accessible name on mobile too.
+- ✅ **Collection-level proof-history normalization** — local-history reads now de-duplicate verification hashes, normalize legacy titles through the shared title limit, sort chronologically, and enforce the same 500-record cap as writes. Imported/tampered/future-synced payloads cannot inflate totals, create duplicate recall rows, or cause an unbounded homepage render.
+- ✅ **Precise local-storage privacy copy** — the recall UI now says the *proof list* is kept on-device instead of claiming “nothing uploaded,” which was false when configured production persistence stored the certified document.
+
+### Certification-boundary honesty + retry-safety polish (prior revision)
 - ✅ **Configured database writes are now part of success** — `POST /api/documents` no longer swallows a failed INSERT and returns a hash that only works in the writer's browser session. With `DATABASE_URL` configured, a failed write returns retryable `503` + `no-store`; the editor reports the temporary failure and keeps the autosaved draft. The intentionally unconfigured MVP demo path remains available.
 - ✅ **Malformed request JSON returns 400** — empty, truncated, invalid, array, and primitive request bodies are classified at the API boundary instead of falling through to a misleading 500. This makes the pre-Phase-2.1 contract actionable for external callers.
 - ✅ **Successful certification responses are validated before navigation** — the editor requires a correctly formatted verification hash and non-empty document ID before writing the browser handoff, routing to success, or allowing the draft to clear. A malformed 2xx can no longer strand the writer at `/success/undefined` and erase recoverable work.
@@ -433,7 +439,9 @@ The current product is single-shot. Phase 1 turns each certified piece into a re
 
 ### 1.4 Writing streaks — partial
 - ✅ Local-first total + consecutive-day streak surfaced on `/success/<hash>` via `lib/history.ts` (`localStorage`-backed, idempotent on hash). First surface before accounts; migrates to a server-synced record once 1.2 lands.
+- ✅ **Local weekly recap** — `history.ts` now derives the count of pieces and words certified since local Monday; `/` surfaces both totals and `/success` includes the weekly piece count. This ships the useful progress feedback from the planned digest without requiring an account, email address, or tracker.
 - ✅ Streak also surfaced on `/write` — a calm *"N-day streak"* header pill shown as the writer sits down, reinforcing the habit *before* certifying rather than only rewarding it after. Reuses `getStreakSummary()` (previously a dead export).
+- ✅ **The editor identifies an at-risk streak** — when the active run is anchored on yesterday rather than already secured today, `/write` adds *“finish today”* (and an equivalent accessible name at narrow widths), putting the nudge on the surface where it can change the outcome.
 - ✅ Streak also surfaced on `/` — the page a returning writer actually lands on was the one surface that recalled their *work* (proofs, unfinished draft) without ever reflecting the *habit*. The "Your proofs" header now carries the same streak line and **Best yet** recognition, reusing the `getStreakSummary()` call the component was already making for its total. The loop now closes on all three surfaces a writer passes through: arrive (`/`), sit down (`/write`), finish (`/success`).
 - ✅ Personal-best recognition — `history.ts` tracks the longest-ever consecutive-day run (`best`) and the `/success` pill shows *"Best yet"* when the active streak ties the record, so the habit loop celebrates milestones, not just totals.
 - ✅ **Proof recall** — `getRecentCertifications()` reads the local history back out and `/success/<hash>` lists the writer's other certified pieces (title, date, word count, score) as links to their verification pages. Until this shipped the records were write-only, so a writer who lost a verification link lost the proof. This is the pre-accounts stand-in for the 1.2 profile list.

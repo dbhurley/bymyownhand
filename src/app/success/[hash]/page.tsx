@@ -132,9 +132,13 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
             Your writing has been verified as authentically human.
           </p>
           {streakSummary && streakSummary.total > 0 && (
-            <div className="mt-6 inline-flex items-center gap-3 px-4 py-2 bg-white border border-deep-blue/[0.08] rounded-full text-sm">
+            <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-3 px-4 py-2 bg-white border border-deep-blue/[0.08] rounded-2xl text-sm">
               <span className="text-deep-blue/70">
                 <span className="font-semibold text-deep-blue">{streakSummary.total}</span> certified piece{streakSummary.total === 1 ? '' : 's'}
+              </span>
+              <span className="w-1 h-1 rounded-full bg-deep-blue/20" />
+              <span className="text-deep-blue/70">
+                <span className="font-semibold text-deep-blue">{streakSummary.thisWeek}</span> this week
               </span>
               {streakSummary.streak > 1 && (
                 <>
@@ -377,7 +381,7 @@ export default function SuccessPage({ params }: { params: Promise<{ hash: string
                 components/ProofList.tsx for why the rows live in one place. */}
             <ProofList proofs={recentProofs} />
             <p className="text-xs text-deep-blue/35 mt-3">
-              Kept on this device only — no account needed, nothing uploaded.
+              This proof list is kept on this device — no account needed.
             </p>
           </div>
         )}
