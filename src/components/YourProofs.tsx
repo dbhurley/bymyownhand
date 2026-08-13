@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef, useState, useSyncExternalStore } from 'react';
-import { getRecentCertifications, getStreakSummary, type CertificationRecord, type StreakSummary } from '@/lib/history';
+import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
+import { getRecentCertifications, getStreakSummary, subscribeToHistory, type CertificationRecord, type StreakSummary } from '@/lib/history';
 import { ProofList } from '@/components/ProofList';
 
 // A returning writer's own certified pieces, recalled from the local-first
@@ -48,9 +48,9 @@ const EXPANDED_LIMIT = 25;
 // which is exactly the no-mismatch behavior we need, without the extra render
 // pass a state update in an effect costs. The snapshot must be referentially
 // stable across renders — `getRecentCertifications()` allocates a fresh array
-// each call — so it is memoized per mount in a ref. Nothing mutates the history
-// while this page is open (certification happens on `/write` → `/success`), so
-// there is no change to subscribe to.
+// each call — so it is memoized in a ref and invalidated only by the shared
+// history subscription. That subscription matters when certification finishes
+// in another tab while this landing page remains open.
 interface ProofsSnapshot {
   proofs: CertificationRecord[];
   summary: StreakSummary;
@@ -67,16 +67,19 @@ const EMPTY_SNAPSHOT: ProofsSnapshot = {
     certifiedToday: false,
   },
 };
-const noopSubscribe = () => () => {};
-
 export function YourProofs() {
   const snapshot = useRef<ProofsSnapshot | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const subscribe = useCallback((onStoreChange: () => void) =>
+    subscribeToHistory(() => {
+      snapshot.current = null;
+      onStoreChange();
+    }), []);
 
   // Read the expandable set once, then slice per render — expanding is a view
   // change, not a new read, so the store snapshot stays referentially stable.
   const { proofs, summary } = useSyncExternalStore(
-    noopSubscribe,
+    subscribe,
     () =>
       (snapshot.current ??= {
         proofs: getRecentCertifications(EXPANDED_LIMIT),

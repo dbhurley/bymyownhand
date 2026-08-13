@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useSyncExternalStore } from 'react';
+import { useCallback, useRef, useSyncExternalStore } from 'react';
 import Link from 'next/link';
-import { formatDraftAge, formatDraftExpiry, loadDraft } from '@/lib/draft';
+import { formatDraftAge, formatDraftExpiry, loadDraft, subscribeToDraft } from '@/lib/draft';
 import { countWords } from '@/lib/metrics';
 
 // A returning writer's *unfinished* piece, recalled on the landing page.
@@ -30,23 +30,27 @@ import { countWords } from '@/lib/metrics';
 //
 // Renders nothing when there is no draft, so a first-time visitor, a crawler,
 // and the server-rendered HTML all see today's page exactly as it is.
-// `loadDraft()` is read once per mount through a ref — it is an external store
-// (and it prunes an expired draft as a side effect), so it must not re-run on
-// every render — and delivered via `useSyncExternalStore` with an empty server
-// snapshot, the same pattern `YourProofs` uses for the history.
+// `loadDraft()` is memoized through a ref — it is an external store (and it
+// prunes an expired draft as a side effect), so it must not re-run on every
+// render — then invalidated only when the shared draft subscription reports a
+// save/clear. `useSyncExternalStore` keeps the server snapshot empty, the same
+// no-mismatch pattern `YourProofs` uses for the history.
 interface DraftSummary {
   title: string;
   wordCount: number;
   savedAt: number;
 }
 
-const noopSubscribe = () => () => {};
-
 export function UnfinishedDraft() {
   const snapshot = useRef<DraftSummary | null | undefined>(undefined);
+  const subscribe = useCallback((onStoreChange: () => void) =>
+    subscribeToDraft(() => {
+      snapshot.current = undefined;
+      onStoreChange();
+    }), []);
 
   const draft = useSyncExternalStore(
-    noopSubscribe,
+    subscribe,
     () => {
       if (snapshot.current === undefined) {
         const stored = loadDraft();

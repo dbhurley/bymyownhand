@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { MAX_DOCUMENT_TITLE_LENGTH, type WritingSession } from '@/lib/types';
 import { clearDraft, formatDraftAge, formatDraftExpiry, loadDraft, type DraftSnapshot } from '@/lib/draft';
 import { countWords } from '@/lib/metrics';
-import { getStreakSummary, recordCertification, type StreakSummary } from '@/lib/history';
+import { getStreakSummary, recordCertification, subscribeToHistory, type StreakSummary } from '@/lib/history';
 import { isValidVerificationHash } from '@/lib/hash';
 import { writeSessionHandoff } from '@/lib/sessionHandoff';
 import {
@@ -80,9 +80,11 @@ export default function WritePage() {
     // local-first streak the /success page records into `lib/history.ts`
     // (Phase 1.4). Seeing "3-day streak" as you sit down to write is the
     // reinforcement half of the habit loop the success-page pill only rewards
-    // *after* the fact. Reads localStorage on mount, so it stays a client-only
-    // effect; shows nothing until a first piece is certified.
+    // *after* the fact. Reads localStorage on mount and subscribes while the
+    // editor stays open, so a certification in another tab updates the prompt;
+    // shows nothing until a first piece is certified.
     setStreak(getStreakSummary());
+    return subscribeToHistory(() => setStreak(getStreakSummary()));
   }, []);
 
   const handleResume = () => setDecision('resume');
@@ -323,6 +325,7 @@ function ResumeBanner({
   onResume: () => void;
   onDiscard: () => void;
 }) {
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const wordCount = countWords(draft.content);
   // The 24h window was enforced silently — see formatDraftExpiry(). A writer
   // deciding whether to resume should know how long the choice stays open.
@@ -350,12 +353,21 @@ function ResumeBanner({
             Resume draft
           </button>
           <button
-            onClick={onDiscard}
-            className="flex-1 px-5 py-3 border border-deep-blue/15 text-deep-blue rounded-full font-medium text-sm hover:bg-deep-blue/5 transition-colors"
+            onClick={() => confirmDiscard ? onDiscard() : setConfirmDiscard(true)}
+            className={`flex-1 px-5 py-3 border rounded-full font-medium text-sm transition-colors ${
+              confirmDiscard
+                ? 'border-red-200 text-red-600 hover:bg-red-50'
+                : 'border-deep-blue/15 text-deep-blue hover:bg-deep-blue/5'
+            }`}
           >
-            Start fresh
+            {confirmDiscard ? 'Discard saved draft' : 'Start fresh'}
           </button>
         </div>
+        {confirmDiscard && (
+          <p role="status" className="mt-3 text-xs text-red-600 text-center">
+            This permanently deletes the saved draft. Choose Discard saved draft again to continue.
+          </p>
+        )}
       </div>
     </div>
   );

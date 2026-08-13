@@ -4,7 +4,7 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
 import { MAX_DOCUMENT_TITLE_LENGTH, type KeystrokeEvent, type WritingSession } from '@/lib/types';
 import { calculateMetrics, calculateIntegrityScore, countWords, formatDuration } from '@/lib/metrics';
-import { clearDraft, DRAFT_STORAGE_KEY, type DraftSnapshot } from '@/lib/draft';
+import { clearDraft, saveDraft, type DraftSnapshot } from '@/lib/draft';
 import { nanoid } from 'nanoid';
 
 interface LockedEditorProps {
@@ -616,14 +616,11 @@ export default function LockedEditor({ onComplete, title, onTitleChange, initial
         blockedPasteCount: b,
         savedAt: Date.now(),
       };
-      try {
-        window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
+      if (saveDraft(snapshot)) {
         // Only after the write actually lands: a quota failure must leave the
         // next tick free to retry rather than record a snapshot that isn't
         // there.
         lastPersistedRef.current = { title: t, content: c, blockedPasteCount: b, eventCount };
-      } catch {
-        // Quota exceeded or storage disabled — silently skip.
       }
     };
 

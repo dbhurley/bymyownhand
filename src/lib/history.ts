@@ -9,6 +9,7 @@ import { isValidVerificationHash } from './hash';
 import { MAX_DOCUMENT_TITLE_LENGTH } from './types';
 
 const HISTORY_STORAGE_KEY = 'bmoh:history:v1';
+const HISTORY_CHANGED_EVENT = 'bmoh:history-changed';
 const MAX_ENTRIES = 500;
 
 export interface CertificationRecord {
@@ -110,9 +111,28 @@ function writeHistory(history: CertificationRecord[]) {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history.slice(-MAX_ENTRIES)));
+    // `storage` only fires in *other* tabs. Emit a same-tab event as well so
+    // every mounted return surface can use one subscription contract.
+    window.dispatchEvent(new Event(HISTORY_CHANGED_EVENT));
   } catch {
     // Quota exceeded or storage disabled — silently skip.
   }
+}
+
+// Keep local-first proof recall, weekly progress, and streak feedback current
+// when another tab certifies a piece. The original no-op subscriptions froze
+// each surface at mount time even though localStorage is shared across tabs.
+export function subscribeToHistory(onStoreChange: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === HISTORY_STORAGE_KEY) onStoreChange();
+  };
+  window.addEventListener('storage', onStorage);
+  window.addEventListener(HISTORY_CHANGED_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener('storage', onStorage);
+    window.removeEventListener(HISTORY_CHANGED_EVENT, onStoreChange);
+  };
 }
 
 // Idempotent: recording the same hash twice (e.g. a re-visit to /success)

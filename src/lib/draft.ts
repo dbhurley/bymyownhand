@@ -2,6 +2,7 @@ import type { KeystrokeEvent } from './types';
 import { isValidKeystrokeEvent } from './metrics';
 
 export const DRAFT_STORAGE_KEY = 'bmoh:draft:v1';
+const DRAFT_CHANGED_EVENT = 'bmoh:draft-changed';
 
 // A draft is only worth offering to resume if it's recent enough that the
 // keystroke trace remains a coherent record of the same writing session.
@@ -70,7 +71,37 @@ function isValidDraftSnapshot(value: unknown): value is DraftSnapshot {
 
 export function clearDraft() {
   if (typeof window === 'undefined') return;
-  try { window.localStorage.removeItem(DRAFT_STORAGE_KEY); } catch {}
+  try {
+    window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+    window.dispatchEvent(new Event(DRAFT_CHANGED_EVENT));
+  } catch {}
+}
+
+export function saveDraft(snapshot: DraftSnapshot): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
+    // Same-tab counterpart to the browser's cross-tab `storage` event.
+    window.dispatchEvent(new Event(DRAFT_CHANGED_EVENT));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Let the landing-page recall card appear, update, or disappear when a writer
+// works in another tab instead of freezing the card at its mount-time value.
+export function subscribeToDraft(onStoreChange: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === DRAFT_STORAGE_KEY) onStoreChange();
+  };
+  window.addEventListener('storage', onStorage);
+  window.addEventListener(DRAFT_CHANGED_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener('storage', onStorage);
+    window.removeEventListener(DRAFT_CHANGED_EVENT, onStoreChange);
+  };
 }
 
 // How long the writer has left to come back for this draft, or `null` once the
@@ -89,13 +120,17 @@ export function clearDraft() {
 // window is 24h since the writer last worked on the piece, and simply opening
 // the draft again extends it.
 export function formatDraftExpiry(savedAt: number): string | null {
-  const remaining = DRAFT_MAX_AGE_MS - (Date.now() - savedAt);
+  // Clamp future/tampered timestamps to one full window and round up. Flooring
+  // made a brand-new save say "expires in 23h" immediately, while a clock set
+  // into the future could advertise more than the real 24-hour contract.
+  const remaining = Math.min(DRAFT_MAX_AGE_MS, DRAFT_MAX_AGE_MS - (Date.now() - savedAt));
   if (remaining <= 0) return null;
-  const hours = Math.floor(remaining / (60 * 60 * 1000));
-  if (hours >= 1) return `expires in ${hours}h`;
-  // Floor at one minute rather than showing "expires in 0m" for the last 60
-  // seconds of the window.
-  const minutes = Math.max(1, Math.floor(remaining / (60 * 1000)));
+  const hourMs = 60 * 60 * 1000;
+  if (remaining >= hourMs) {
+    const hours = Math.ceil(remaining / hourMs);
+    return `expires in ${hours}h`;
+  }
+  const minutes = Math.max(1, Math.ceil(remaining / (60 * 1000)));
   return `expires in ${minutes}m`;
 }
 
