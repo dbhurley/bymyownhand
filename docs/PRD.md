@@ -1,6 +1,6 @@
 # By My Own Hand — Product Requirements Document
 
-> **Last updated:** 2026-08-13
+> **Last updated:** 2026-08-14
 > **Status:** Living document — evolves with the roadmap
 > **Owner:** DB Hurley
 
@@ -131,7 +131,13 @@ Computed at submission time:
 - **Single `buildEmbedSnippets(verifyUrl)` helper in `lib/embed.ts`** — the markdown + HTML embed-badge snippets were defined inline in *both* `success/[hash]` and `verify/[hash]` with the same `width=120, height=107` aspect-ratio comment in each copy. A future tweak (alt-text wording, query-string tracking, a v2 logo URL) had two places to drift from. The snippet generator now lives in one helper, mirroring the prior `getScoreLabel` / `getSiteUrl` consolidations. Drift-prevention before the script-tag and iframe variants land in Phase 1.3.
 - **Defensive blog-date handling in `sitemap.ts` and `feed.json`** — posts with a missing or unparseable `date` used to fall through into the sitemap with `lastModified=now` (the same freshness-lie pattern §6.11 just fixed for `/blog`) and into the JSON Feed with a literal `"T00:00:00Z"` `date_published` (which most feed validators reject — a bad signal for Phase 4.1's opt-in feed work and any partner ingesting the feed). Both routes now skip such posts entirely rather than emit a misleading entry. Today's content corpus all parses cleanly; the change protects discovery surface against a future post landing without a date in frontmatter.
 
-### 6.78 Live local-retention + draft-safety polish (this revision)
+### 6.79 Local proof-history privacy controls (this revision)
+- **Writers can manage the proof list kept on their device** — the landing-page recall section now has an explicit manage mode. Each visible proof gains a two-step Remove action with a title-specific accessible name, so an accidental tap cannot silently discard the local path back to a certified piece.
+- **The whole local list can be cleared** — Clear list also requires a second confirmation, removes the storage key instead of leaving an empty payload, and immediately hides the return surface. This is the first direct data-deletion control for the local-first portfolio.
+- **Deletion scope is stated before action** — management copy explains that removal affects only the on-device recall link. It does not claim to delete the certified document or invalidate a shared verification URL.
+- **Habit feedback follows the retained records** — single-record and clear-all actions use the same notification-aware storage path as certification. Totals, weekly progress, streaks, and other open tabs update immediately, and an assistive-technology status message confirms success or reports unavailable browser storage.
+
+### 6.78 Live local-retention + draft-safety polish (prior revision)
 - **Local return surfaces now stay current across tabs** — proof history exposes a real browser-storage subscription instead of a no-op. A certification completed in another tab immediately refreshes the landing-page proof list, weekly recap, and streak, plus the streak prompt in an already-open editor. The local-first portfolio now behaves like shared device state rather than a mount-time snapshot.
 - **The unfinished-draft card is live too** — draft saves and clears use one storage helper and notify subscribers, so an open landing page can surface, update, or remove the draft card while the writer works elsewhere. The homepage no longer keeps advertising an older snapshot—or no draft at all—until reload.
 - **Draft expiry copy reports the full promised window** — the countdown previously floored the remaining duration, so a newly saved draft immediately said “expires in 23h.” It now rounds up and clamps future/device-clock-skewed timestamps to the documented 24-hour maximum; a new save says 24h and no local value can advertise a longer guarantee.

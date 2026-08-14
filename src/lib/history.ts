@@ -107,15 +107,26 @@ function normalizeTitle(title: string | undefined): string | undefined {
   return normalized || undefined;
 }
 
-function writeHistory(history: CertificationRecord[]) {
-  if (typeof window === 'undefined') return;
+function writeHistory(history: CertificationRecord[]): boolean {
+  if (typeof window === 'undefined') return false;
   try {
-    window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history.slice(-MAX_ENTRIES)));
+    const persistedHistory = history.slice(-MAX_ENTRIES);
+    if (persistedHistory.length === 0) {
+      // An empty history is absence of local data, not a stored empty payload.
+      // Removing the key also makes "Clear list" easy to verify in browser
+      // storage tools and avoids leaving a durable marker after the writer asks
+      // us to clear their on-device record.
+      window.localStorage.removeItem(HISTORY_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(persistedHistory));
+    }
     // `storage` only fires in *other* tabs. Emit a same-tab event as well so
     // every mounted return surface can use one subscription contract.
     window.dispatchEvent(new Event(HISTORY_CHANGED_EVENT));
+    return true;
   } catch {
     // Quota exceeded or storage disabled — silently skip.
+    return false;
   }
 }
 
@@ -179,6 +190,22 @@ export function getRecentCertifications(limit = 5, excludeHash?: string): Certif
     // "newest first" is true by construction rather than by assumption.
     .sort((a, b) => b.certifiedAt - a.certifiedAt)
     .slice(0, Math.max(0, limit));
+}
+
+// Remove only the on-device recall record. The certified document and any
+// shared verification URL remain untouched. Writing through `writeHistory()`
+// keeps the landing-page summaries and other open tabs on the same state.
+export function removeCertification(hash: string): boolean {
+  const history = readHistory();
+  if (!isValidVerificationHash(hash)) return false;
+
+  const nextHistory = history.filter(record => record.hash !== hash);
+  if (nextHistory.length === history.length) return false;
+  return writeHistory(nextHistory);
+}
+
+export function clearCertificationHistory(): boolean {
+  return writeHistory([]);
 }
 
 function summarize(history: CertificationRecord[]): StreakSummary {

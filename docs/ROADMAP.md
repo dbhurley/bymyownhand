@@ -1,6 +1,6 @@
 # By My Own Hand — Roadmap
 
-> **Last updated:** 2026-08-13
+> **Last updated:** 2026-08-14
 > Companion to [PRD.md](PRD.md). Items are grouped by phase, not by date — phase boundaries shift with traction signals.
 
 The North Star: **make the act of writing — verifiably and beautifully human — a daily ritual that writers proudly share.**
@@ -57,7 +57,13 @@ The North Star: **make the act of writing — verifiably and beautifully human �
 - ✅ **Shared `buildEmbedSnippets(verifyUrl)` helper in `lib/embed.ts`** — the markdown + HTML embed snippets and the aspect-ratio comment lived inline in both `success/[hash]` and `verify/[hash]`. The snippet generator now lives in one helper (parallels the prior `getScoreLabel` / `getSiteUrl` consolidations), so a tweak — alt-text wording, query-string tracking, v2 logo URL — only has to land once. Drift-prevention before the `embed.js` and `iframe` variants land.
 - ✅ **Defensive blog-date handling in sitemap + JSON Feed** — posts with a missing or unparseable `date` used to leak into the sitemap with `lastModified=now` (the freshness lie this prior revision had just fixed for `/blog`) and into the JSON Feed with a literal `"T00:00:00Z"` `date_published` (which most feed validators reject). Both routes now skip such entries rather than emit a misleading one — protecting discovery surface against a future post landing without a frontmatter date.
 
-### Live local-retention + draft-safety polish (this revision)
+### Local proof-history privacy controls (this revision)
+- ✅ **Two-step removal for one local proof** — the landing-page proof section now has a manage mode. A writer can remove a recalled proof only after a second, title-specific confirmation. The certified document and shared link are not changed.
+- ✅ **Two-step clear-all control** — a writer can clear the entire on-device recall list after confirmation. An empty history removes the storage key instead of persisting an empty marker, and the proof section disappears immediately.
+- ✅ **Clear scope and accessible feedback** — management copy states that the action affects only this device. Each control has a specific accessible name, and a live status message confirms success or reports unavailable browser storage.
+- ✅ **One live history path for writes and removals** — removal uses the existing same-tab and cross-tab notification contract, so proof rows, totals, weekly progress, and streak data stay aligned in every open tab.
+
+### Live local-retention + draft-safety polish (prior revision)
 - ✅ **Cross-tab proof and streak updates** — the landing-page proof list, weekly recap, and streak plus the open editor's streak prompt subscribe to browser-history changes. Certifying in another tab no longer leaves the writer looking at stale habit feedback until reload.
 - ✅ **Cross-tab unfinished-draft recall** — autosave/clear now publish through a shared draft-storage helper, and the landing-page draft card subscribes to it. The return surface appears, updates, and disappears with the real saved work on the device.
 - ✅ **Honest draft-expiry rounding** — a new save now reports the full 24-hour window instead of immediately flooring to 23h, and future/skewed timestamps cannot advertise longer than the product actually promises.
@@ -457,6 +463,7 @@ The current product is single-shot. Phase 1 turns each certified piece into a re
 - ✅ **Proof recall on the landing page** — `/success/<hash>` is reachable only in the session that certified the piece, so the recall list above was visible exactly once per proof. The same list now also renders on `/` for a returning writer (hidden entirely on a device with no history), making the homepage the place a writer's body of work lives until accounts ship. It **expands in place** ("Show all N") to reach every proof on the device rather than only the three newest, with anything past 25 reported rather than silently dropped.
 - ✅ **The streak says when it is at risk** — the run anchors on today *or* yesterday, so an expiring streak read exactly like a banked one. `certifiedToday` on `StreakSummary` (free — derived from the day set the streak scan already builds) drives a calm *"Write today to keep it going."* under the landing-page streak line. The nudge lives on `/` because that is where the writer is standing when the decision gets made.
 - ✅ **Habit feedback stays current across tabs** — proof recall, weekly progress, and the streak surfaces on `/` plus the streak prompt on an already-open `/write` subscribe to the shared local history. A certification in another tab is reflected immediately instead of waiting for reload.
+- ✅ **Local proof-history controls** — the landing-page list now supports two-step removal of one recalled proof and two-step clearing of the whole on-device list. These actions leave certified documents and shared verification links unchanged, remove the storage key when empty, and refresh totals, weekly progress, streaks, and other open tabs through the same history subscription.
 - ☐ Streak counter on the profile (`N consecutive days with a certified piece`).
 - ☐ Optional weekly digest email: "You wrote 4 pieces this week, 92 avg integrity score."
 - *Why it matters:* Habit formation. Converts a tool into a daily ritual.

@@ -1,7 +1,15 @@
 'use client';
 
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
-import { getRecentCertifications, getStreakSummary, subscribeToHistory, type CertificationRecord, type StreakSummary } from '@/lib/history';
+import {
+  clearCertificationHistory,
+  getRecentCertifications,
+  getStreakSummary,
+  removeCertification,
+  subscribeToHistory,
+  type CertificationRecord,
+  type StreakSummary,
+} from '@/lib/history';
 import { ProofList } from '@/components/ProofList';
 
 // A returning writer's own certified pieces, recalled from the local-first
@@ -70,6 +78,10 @@ const EMPTY_SNAPSHOT: ProofsSnapshot = {
 export function YourProofs() {
   const snapshot = useRef<ProofsSnapshot | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [managing, setManaging] = useState(false);
+  const [pendingRemovalHash, setPendingRemovalHash] = useState<string | null>(null);
+  const [clearPending, setClearPending] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
   const subscribe = useCallback((onStoreChange: () => void) =>
     subscribeToHistory(() => {
       snapshot.current = null;
@@ -90,7 +102,47 @@ export function YourProofs() {
     () => EMPTY_SNAPSHOT
   );
 
-  if (proofs.length === 0) return null;
+  const handleRemove = (proof: CertificationRecord) => {
+    if (pendingRemovalHash !== proof.hash) {
+      setPendingRemovalHash(proof.hash);
+      setClearPending(false);
+      return;
+    }
+
+    if (!removeCertification(proof.hash)) {
+      setStatusMessage('This proof could not be removed. Browser storage may be unavailable.');
+      return;
+    }
+    setPendingRemovalHash(null);
+    setStatusMessage(`${proof.title || proof.hash} was removed from this device.`);
+  };
+
+  const handleClear = () => {
+    if (!clearPending) {
+      setClearPending(true);
+      setPendingRemovalHash(null);
+      return;
+    }
+
+    if (!clearCertificationHistory()) {
+      setStatusMessage('The proof list could not be cleared. Browser storage may be unavailable.');
+      return;
+    }
+    setManaging(false);
+    setClearPending(false);
+    setExpanded(false);
+    setStatusMessage('The local proof list was cleared from this device.');
+  };
+
+  const toggleManaging = () => {
+    setManaging(value => !value);
+    setPendingRemovalHash(null);
+    setClearPending(false);
+  };
+
+  if (proofs.length === 0) {
+    return <p role="status" aria-live="polite" className="sr-only">{statusMessage}</p>;
+  }
 
   const { total } = summary;
 
@@ -172,8 +224,45 @@ export function YourProofs() {
             `/success/<hash>` recall list renders. The landing page's narrower
             column is applied by the wrapper, not by a second copy of the card. */}
         <div className="max-w-xl mx-auto">
-          <ProofList proofs={visible} />
+          <ProofList
+            proofs={visible}
+            managing={managing}
+            pendingRemovalHash={pendingRemovalHash}
+            onRemove={handleRemove}
+          />
         </div>
+
+        <p role="status" aria-live="polite" className="sr-only">{statusMessage}</p>
+
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-4">
+          <button
+            type="button"
+            onClick={toggleManaging}
+            aria-pressed={managing}
+            className="text-xs font-medium text-deep-blue/50 hover:text-deep-blue transition-colors underline underline-offset-4 decoration-deep-blue/20"
+          >
+            {managing ? 'Done managing' : 'Manage list'}
+          </button>
+          {managing && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className={`text-xs font-medium transition-colors underline underline-offset-4 ${
+                clearPending
+                  ? 'text-red-700 decoration-red-200 hover:text-red-800'
+                  : 'text-deep-blue/50 decoration-deep-blue/20 hover:text-deep-blue'
+              }`}
+            >
+              {clearPending ? 'Clear all proofs?' : 'Clear list'}
+            </button>
+          )}
+        </div>
+
+        {managing && (
+          <p className="mt-3 text-xs text-deep-blue/40 text-center">
+            Remove hides a proof link from this device only. The certified document stays available at its shared link.
+          </p>
+        )}
 
         {/* Only offer the toggle when it would actually reveal something. Once
             expanded it becomes "Show fewer", so the writer can always get the

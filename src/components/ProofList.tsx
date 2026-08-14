@@ -18,22 +18,31 @@ import { getScoreLabel } from '@/lib/metrics';
 // `buildEmbedSnippets()` / `countWords()` consolidations, and worth doing before
 // the list migrates to the Phase 1.2 `/u/<handle>` portfolio, which will be a
 // third caller of exactly this row.
-export function ProofList({ proofs }: { proofs: CertificationRecord[] }) {
+interface ProofListProps {
+  proofs: CertificationRecord[];
+  managing?: boolean;
+  pendingRemovalHash?: string | null;
+  onRemove?: (proof: CertificationRecord) => void;
+}
+
+export function ProofList({ proofs, managing = false, pendingRemovalHash, onRemove }: ProofListProps) {
   return (
     <ul className="bg-white rounded-2xl border border-deep-blue/[0.06] overflow-hidden divide-y divide-deep-blue/[0.04]">
       {proofs.map(proof => {
         const score = getScoreLabel(proof.integrityScore);
+        const displayTitle = proof.title || proof.hash;
+        const removalPending = pendingRemovalHash === proof.hash;
         return (
-        <li key={proof.hash}>
+        <li key={proof.hash} className="flex items-stretch">
           <Link
             href={`/verify/${proof.hash}`}
-            className="flex items-center justify-between gap-4 px-5 md:px-6 py-3.5 hover:bg-deep-blue/[0.02] transition-colors"
+            className="min-w-0 flex-1 flex items-center justify-between gap-4 px-5 md:px-6 py-3.5 hover:bg-deep-blue/[0.02] transition-colors"
           >
             <span className="min-w-0 flex-1">
               <span className="block text-sm text-deep-blue/75 truncate">
                 {/* Records written before titles were kept fall back to the
                     hash, which is still a meaningful handle. */}
-                {proof.title || proof.hash}
+                {displayTitle}
               </span>
               <span className="block text-xs text-deep-blue/35 mt-0.5">
                 {new Date(proof.certifiedAt).toLocaleDateString('en-US', {
@@ -61,6 +70,20 @@ export function ProofList({ proofs }: { proofs: CertificationRecord[] }) {
               <span className="sr-only"> out of 100, {score.label}</span>
             </span>
           </Link>
+          {managing && onRemove && (
+            <button
+              type="button"
+              onClick={() => onRemove(proof)}
+              aria-label={`${removalPending ? 'Confirm removal of' : 'Remove'} ${displayTitle} from this device`}
+              className={`flex-shrink-0 border-l border-deep-blue/[0.06] px-3 md:px-4 text-xs font-medium transition-colors ${
+                removalPending
+                  ? 'bg-red-50 text-red-700 hover:bg-red-100'
+                  : 'text-deep-blue/45 hover:bg-deep-blue/[0.03] hover:text-deep-blue'
+              }`}
+            >
+              {removalPending ? 'Remove?' : 'Remove'}
+            </button>
+          )}
         </li>
         );
       })}
