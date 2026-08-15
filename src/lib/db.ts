@@ -1,4 +1,5 @@
 import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { isValidVerificationHash } from './hash';
 
 // Lazy initialization - only connect when DATABASE_URL is available
 let _sql: NeonQueryFunction<false, false> | null = null;
@@ -69,18 +70,100 @@ export async function initializeDatabase() {
   `;
 }
 
+// `initializeDatabase()` above was exported and documented — CLAUDE.md still
+// describes the schema as "initialized in src/lib/db.ts" — but nothing in the
+// application ever called it. So on a `DATABASE_URL` pointing at a database that
+// has never had the schema applied by hand (a fresh Neon project, a preview
+// branch, a new environment, a local Postgres), every `INSERT` in
+// `createDocument()` fails with `relation "documents" does not exist`, the
+// route's `catch (dbError)` swallows it as an MVP degradation, and the writer is
+// told their document is certified while nothing is persisted. Their proof link
+// then resolves for exactly as long as their own `sessionStorage` survives, and
+// 404s for everyone they shared it with — the failure mode the PRD's
+// "Database optionality drift" risk names, arriving silently.
+//
+// Ensure the schema once per server lifetime, on the write path only (the read
+// path has nothing to create, and a `SELECT` against a missing table already
+// surfaces as the 404 it is). The check is a single `to_regclass()` lookup, so
+// the steady state costs one cheap roundtrip on the first certification a server
+// instance handles and nothing after that; the DDL itself is
+// `CREATE TABLE IF NOT EXISTS`, so it is a no-op against a database that already
+// has the schema — which is every environment provisioned by hand today.
+//
+// The memo is dropped when the attempt fails so a transient error doesn't leave
+// a server instance permanently convinced the schema is unavailable.
+let schemaReady: Promise<void> | null = null;
+
+export function ensureSchema(): Promise<void> {
+  if (!schemaReady) {
+    schemaReady = (async () => {
+      const sql = getSql();
+      if (!sql) return;
+      const results = await sql`SELECT to_regclass('public.documents') AS documents`;
+      if (results[0]?.documents) return;
+      await initializeDatabase();
+    })().catch((error) => {
+      schemaReady = null;
+      throw error;
+    });
+  }
+  return schemaReady;
+}
+
 // Helper to get document by hash
 export async function getDocumentByHash(hash: string) {
   const sql = getSql();
   if (!sql) return null;
-  
+
+  // Defense-in-depth at the data-access boundary: reject inputs that can't
+  // have been minted by generateVerificationHash() before spending a Neon
+  // roundtrip. GET /api/documents/[hash] already gates this at the route, but
+  // this helper is a reusable library function and the documented Phase 2.1
+  // public API (GET /api/v1/verify/<hash>) will be a second caller — enforcing
+  // the same `isValidVerificationHash()` contract once at the query site keeps
+  // every caller honest. Same trust-boundary principle the route applies.
+  if (!isValidVerificationHash(hash)) return null;
+
   const results = await sql`
     SELECT * FROM documents WHERE verification_hash = ${hash}
   `;
   return results[0] || null;
 }
 
-// Helper to create document
+// The document's title alone, for callers that need nothing else.
+//
+// `getDocumentByHash()` is a `SELECT *`, and the widest column it returns is the
+// `keystroke_data` JSONB — up to the route's 250k-event cap, so megabytes on a
+// long piece — followed by the full `content`. `/verify/<hash>`'s
+// `generateMetadata` was reading exactly one ~40-character string out of that
+// row (the title for the OG/Twitter share card) and discarding the rest. The
+// route is server-rendered on demand, so the whole trace crossed the wire from
+// Neon on every social-scraper unfurl, every crawler fetch, and every human
+// pageload of a shared proof link — which is precisely the traffic the Phase 1.3
+// embed flywheel exists to create, and the volume it is meant to grow.
+//
+// Same `isValidVerificationHash()` gate as the wide read above: no external
+// roundtrip is spent on input that can't have been minted by us. Returns the raw
+// stored title; the caller decides what an empty one means.
+export async function getDocumentTitleByHash(hash: string): Promise<string | null> {
+  const sql = getSql();
+  if (!sql) return null;
+
+  if (!isValidVerificationHash(hash)) return null;
+
+  const results = await sql`
+    SELECT title FROM documents WHERE verification_hash = ${hash}
+  `;
+  const title = results[0]?.title;
+  return typeof title === 'string' ? title : null;
+}
+
+// Helper to create document. Note: the integrity score is derived from the
+// keystroke trace at read time (see lib/metrics.calculateIntegrityScore + the
+// /verify/<hash> page), not persisted to its own column — the trace is the
+// canonical record. The signature used to accept an `integrityScore` field
+// that the INSERT never used, which would mislead a future reader into
+// thinking the column existed.
 export async function createDocument(doc: {
   id: string;
   title: string;
@@ -89,12 +172,21 @@ export async function createDocument(doc: {
   writingTimeMs: number;
   verificationHash: string;
   keystrokeData: object;
-  integrityScore: number;
 }) {
   const sql = getSql();
   if (!sql) {
     console.warn('No DATABASE_URL configured, document not persisted');
     return doc;
+  }
+
+  // Best-effort: a database whose role can't run DDL (a locked-down production
+  // grant) should still take the INSERT, which is the operation that matters
+  // here. Log and continue rather than failing a real writer's certification
+  // over a schema check.
+  try {
+    await ensureSchema();
+  } catch (error) {
+    console.error('Schema initialization failed:', error);
   }
 
   await sql`

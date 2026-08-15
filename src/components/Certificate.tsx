@@ -1,25 +1,39 @@
 'use client';
 
-import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import type { WritingMetrics } from '@/lib/types';
-import { formatDuration } from '@/lib/metrics';
+import { computeWpm, formatDuration } from '@/lib/metrics';
+import { getCanonicalVerifyUrl } from '@/lib/site';
 
-// Register fonts
-Font.register({
-  family: 'Inter',
-  fonts: [
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2' },
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuGKYAZ9hiJ-Ek-_EeA.woff2', fontWeight: 600 },
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuFuYAZ9hiJ-Ek-_EeA.woff2', fontWeight: 700 },
-  ]
-});
+// The certificate renders in PDF's built-in standard fonts (Helvetica for the
+// body, Courier for the hash) rather than a registered web font.
+//
+// It used to `Font.register()` three Inter weights by URL from
+// `fonts.gstatic.com`, which broke the download outright for a plausible class
+// of documents: those Google-hosted files are *subset* woff2s, and rendering an
+// em dash (U+2014) through them throws `Offset is outside the bounds of the
+// DataView` inside the font pipeline — so a writer whose title reads
+// "Notes — Draft 2" pressed Download Certificate and got
+// "Could not generate the certificate. Please try again." with no retry that
+// could ever succeed. Reproduced against these exact three URLs with the
+// installed @react-pdf/renderer: plain ASCII, en dash, ellipsis, curly quotes,
+// and accented Latin all render; the em dash fails every time. Writers use em
+// dashes.
+//
+// Registering them also made the one durable, portable artifact we hand a
+// writer depend on a third-party CDN *at download time* — so the certificate
+// failed offline, behind a content blocker that filters `fonts.gstatic.com`, or
+// on a network that can't reach Google, and every download made a request to a
+// third party from a page about proving one's own work. The standard-14 fonts
+// are embedded in every PDF reader: no fetch, no failure mode, and the same
+// glyph coverage the subsets actually provided (WinAnsi Latin).
 
 const styles = StyleSheet.create({
   page: {
     flexDirection: 'column',
     backgroundColor: '#f5f0e8',
     padding: 50,
-    fontFamily: 'Inter',
+    fontFamily: 'Helvetica',
   },
   header: {
     flexDirection: 'row',
@@ -162,12 +176,6 @@ const styles = StyleSheet.create({
   qrSection: {
     alignItems: 'center',
   },
-  qrPlaceholder: {
-    width: 80,
-    height: 80,
-    backgroundColor: '#1e3a5f',
-    borderRadius: 4,
-  },
   timestamp: {
     fontSize: 9,
     color: '#1e3a5f',
@@ -198,8 +206,8 @@ export function Certificate({
   certifiedAt,
   qrCodeDataUrl,
 }: CertificateProps) {
-  const verifyUrl = `https://bymyownhand.com/verify/${verificationHash}`;
-  const wpm = Math.round((wordCount / writingTimeMs) * 60000);
+  const verifyUrl = getCanonicalVerifyUrl(verificationHash);
+  const wpm = Math.round(computeWpm(wordCount, writingTimeMs));
 
   return (
     <Document>
@@ -280,18 +288,29 @@ export function Certificate({
           </View>
           {qrCodeDataUrl && (
             <View style={styles.qrSection}>
+              {/* This is @react-pdf/renderer's `Image`, which draws into the PDF
+                  and has no `alt` concept — the jsx-a11y/alt-text rule (written
+                  for DOM <img>) is a false positive here. The QR only encodes
+                  the verification URL, which is already printed as text in the
+                  footer beside it, so it carries no information a reader loses. */}
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
               <Image src={qrCodeDataUrl} style={{ width: 80, height: 80 }} />
             </View>
           )}
         </View>
 
         <Text style={styles.timestamp}>
-          Certified on {certifiedAt.toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
+          {/* `certifiedAt` is the moment the PDF is generated (download time),
+              not the true certification timestamp, so the certificate
+              deliberately renders date-granularity only. The previous call
+              also passed `hour`/`minute` options to `toLocaleDateString`, which
+              silently ignores them (they belong to `toLocaleString`) — dead
+              options that advertised a time-precision this line neither renders
+              nor should claim. Dropped in the §6.24 surface-honesty spirit. */}
+          Certified on {certifiedAt.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
             day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
           })}
         </Text>
       </Page>

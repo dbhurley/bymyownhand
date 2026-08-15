@@ -1,0 +1,146 @@
+import type { KeystrokeEvent } from './types';
+import { isValidKeystrokeEvent } from './metrics';
+
+export const DRAFT_STORAGE_KEY = 'bmoh:draft:v1';
+const DRAFT_CHANGED_EVENT = 'bmoh:draft-changed';
+
+// A draft is only worth offering to resume if it's recent enough that the
+// keystroke trace remains a coherent record of the same writing session.
+export const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h
+
+export interface DraftSnapshot {
+  sessionId: string;
+  title: string;
+  content: string;
+  events: KeystrokeEvent[];
+  startTime: number;
+  blockedPasteCount: number;
+  savedAt: number;
+}
+
+export function loadDraft(): DraftSnapshot | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+
+    // Strict schema check. A corrupted or tampered localStorage value
+    // previously slipped past a `parsed?.content && typeof parsed.startTime === 'number'`
+    // check, leaving downstream code (LockedEditor's resume timeline rebase,
+    // calculateMetrics, the autosave persist that reuses the snapshot's
+    // sessionId) to crash on a missing `events` array, a non-string title,
+    // or a non-numeric `savedAt` / `blockedPasteCount`. We'd rather discard a
+    // bad draft and start fresh than half-restore a broken one.
+    if (!isValidDraftSnapshot(parsed)) {
+      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+      return null;
+    }
+    if (Date.now() - parsed.savedAt > DRAFT_MAX_AGE_MS) {
+      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function isValidDraftSnapshot(value: unknown): value is DraftSnapshot {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.sessionId === 'string' &&
+    v.sessionId.length > 0 &&
+    typeof v.title === 'string' &&
+    typeof v.content === 'string' &&
+    Array.isArray(v.events) &&
+    v.events.every(isValidKeystrokeEvent) &&
+    typeof v.startTime === 'number' &&
+    Number.isFinite(v.startTime) &&
+    v.startTime > 0 &&
+    typeof v.blockedPasteCount === 'number' &&
+    Number.isFinite(v.blockedPasteCount) &&
+    Number.isInteger(v.blockedPasteCount) &&
+    v.blockedPasteCount >= 0 &&
+    typeof v.savedAt === 'number' &&
+    Number.isFinite(v.savedAt) &&
+    v.savedAt > 0
+  );
+}
+
+export function clearDraft() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+    window.dispatchEvent(new Event(DRAFT_CHANGED_EVENT));
+  } catch {}
+}
+
+export function saveDraft(snapshot: DraftSnapshot): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
+    // Same-tab counterpart to the browser's cross-tab `storage` event.
+    window.dispatchEvent(new Event(DRAFT_CHANGED_EVENT));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Let the landing-page recall card appear, update, or disappear when a writer
+// works in another tab instead of freezing the card at its mount-time value.
+export function subscribeToDraft(onStoreChange: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === DRAFT_STORAGE_KEY) onStoreChange();
+  };
+  window.addEventListener('storage', onStorage);
+  window.addEventListener(DRAFT_CHANGED_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener('storage', onStorage);
+    window.removeEventListener(DRAFT_CHANGED_EVENT, onStoreChange);
+  };
+}
+
+// How long the writer has left to come back for this draft, or `null` once the
+// window has closed.
+//
+// `DRAFT_MAX_AGE_MS` is a hard deadline enforced silently: `loadDraft()` deletes
+// an expired draft on the next read and returns nothing, so a writer who left a
+// substantial piece behind and came back a day later found no draft, no notice,
+// and no explanation — the exact loss Phase 1.1 exists to prevent, arriving
+// through the front door instead of a tab close. Both surfaces that announce a
+// draft ("saved 23h ago" on `/`, the same on the `/write` resume banner) told
+// the writer how old it was and nothing about how long it had left, which is
+// the half that would actually get them back into the editor.
+//
+// Measured from `savedAt`, which the autosave refreshes on every tick — so the
+// window is 24h since the writer last worked on the piece, and simply opening
+// the draft again extends it.
+export function formatDraftExpiry(savedAt: number): string | null {
+  // Clamp future/tampered timestamps to one full window and round up. Flooring
+  // made a brand-new save say "expires in 23h" immediately, while a clock set
+  // into the future could advertise more than the real 24-hour contract.
+  const remaining = Math.min(DRAFT_MAX_AGE_MS, DRAFT_MAX_AGE_MS - (Date.now() - savedAt));
+  if (remaining <= 0) return null;
+  const hourMs = 60 * 60 * 1000;
+  if (remaining >= hourMs) {
+    const hours = Math.ceil(remaining / hourMs);
+    return `expires in ${hours}h`;
+  }
+  const minutes = Math.max(1, Math.ceil(remaining / (60 * 1000)));
+  return `expires in ${minutes}m`;
+}
+
+export function formatDraftAge(savedAt: number): string {
+  const seconds = Math.max(1, Math.floor((Date.now() - savedAt) / 1000));
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}

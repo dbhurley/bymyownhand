@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { getSiteUrl } from "@/lib/site";
+import { ogShareImages, twitterShareImages } from "@/lib/share";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-bricolage",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -12,13 +15,68 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl = getSiteUrl();
+
 export const metadata: Metadata = {
-  title: "By My Own Hand | Prove Your Writing is Human",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "By My Own Hand | Prove Your Writing is Human",
+    template: "%s | By My Own Hand",
+  },
   description: "Certify your writing was created by your own hands. Block AI, capture keystrokes, prove authenticity.",
+  applicationName: "By My Own Hand",
+  // Org-level attribution meta (`<meta name="creator">` / `<meta name="publisher">`).
+  // `creator` is the product's creator — David Hurley, grounded in the site's own
+  // public/llms.txt and matching the Organization JSON-LD `founder`; `publisher`
+  // is the organization behind every page. Both are org-level, so they stay
+  // correct for the routes that inherit this metadata (unlike per-post `authors`,
+  // deliberately omitted so a guest-authored blog post isn't mis-attributed).
+  // Additive, zero-risk attribution enrichment in the Organization `founder` /
+  // `slogan` lineage.
+  creator: "David Hurley",
+  publisher: "By My Own Hand",
+  keywords: [
+    "human writing",
+    "AI detection",
+    "writing authenticity",
+    "keystroke verification",
+    "proof of human",
+    "content provenance",
+  ],
+  alternates: { canonical: "/" },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/logo.svg", type: "image/svg+xml" },
+      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
   openGraph: {
     title: "By My Own Hand",
-    description: "Prove your writing is authentically human",
+    description: "Prove your writing is authentically human — keystroke by keystroke.",
+    url: siteUrl,
+    siteName: "By My Own Hand",
     type: "website",
+    locale: "en_US",
+    // A default share image so social previews render a card instead of a bare
+    // link. The Twitter card was already declared `summary_large_image` but no
+    // image was ever set anywhere, so every share of the marketing site, the
+    // editor, and verification links degraded to a text-only preview — a miss
+    // for sharing, which the PRD lists as a core success metric (each share is
+    // a marketing event). Resolved relative to `metadataBase` above.
+    images: ogShareImages("By My Own Hand"),
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "By My Own Hand",
+    description: "Prove your writing is authentically human — keystroke by keystroke.",
+    images: twitterShareImages("By My Own Hand"),
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 };
 
@@ -30,12 +88,49 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+        {/* Do NOT pin `maximum-scale=1` / `user-scalable=no` — disabling
+            pinch-zoom is a WCAG 2.1 SC 1.4.4 (Resize Text) / 1.4.10 (Reflow)
+            failure that locks out low-vision readers, and it's flagged by the
+            Lighthouse accessibility audit. Our audience reads long-form prose
+            on `/verify`, the blog, and the editor, so zoom matters. Keep
+            `viewport-fit=cover` for the PWA edge-to-edge layout; let users
+            scale. Accessibility is an always-on cross-cutting investment in
+            the roadmap, alongside the §6.29 verification-link `aria-label`. */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
+        {/* iOS-specific home-screen label. When a reader adds the site to their
+            iOS home screen, Safari derives the icon's title from the page's
+            `<title>` — here the long "By My Own Hand | Prove Your Writing is
+            Human" — which truncates to something like "By My Own…". The
+            Web App Manifest's `short_name` ("BMOH") controls this on Android but
+            iOS Safari ignores the manifest for the label and reads this meta
+            instead. Set it to the same brand shorthand the manifest already
+            uses so the home-screen entry reads cleanly on both platforms.
+            Mobile-PWA polish sibling of the `theme-color` / manifest `short_name`
+            work; the majority of traffic is mobile. */}
+        <meta name="apple-mobile-web-app-title" content="BMOH" />
+        {/* Brand deep-blue (--deep-blue) for the mobile browser chrome / PWA
+            title bar, matching the `theme_color` in app/manifest.ts. Without
+            it the address-bar tints to a default, off-brand color on Android
+            Chrome and the installed-PWA title bar. The site is light-only
+            (cream surface), so a single theme-color is correct — no per-scheme
+            variants needed. */}
+        <meta name="theme-color" content="#1e3a5f" />
+        {/* JSON Feed auto-discovery. The §6.37 fix set the spec-correct
+            `application/feed+json` media type on the feed route *so that*
+            content-type-sniffing feed readers recognize it as subscribable —
+            but a reader can only sniff a feed it can find, and there was no
+            `<link rel="alternate">` advertising it anywhere in the document
+            head. Declaring it here (raw in <head> rather than via Metadata's
+            `alternates.types`, so it survives on the blog routes that override
+            `alternates` for their per-page canonical URLs, §6.35) completes the
+            autodiscovery path: a reader's "subscribe" on any page now finds the
+            blog feed. Discovery-surface sibling of the §6.37 media-type fix. */}
+        <link rel="alternate" type="application/feed+json" title="By My Own Hand Blog" href="/api/blog/feed.json" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${bricolage.variable} ${geistMono.variable} antialiased`}
       >
         {children}
       </body>

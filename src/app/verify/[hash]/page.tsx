@@ -1,9 +1,23 @@
 'use client';
 
-import { useEffect, useState, use, useRef } from 'react';
+import { useEffect, useState, use, useRef, useMemo } from 'react';
 import Link from 'next/link';
-import type { Document, WritingMetrics, KeystrokeEvent } from '@/lib/types';
-import { formatDuration } from '@/lib/metrics';
+import type { WritingMetrics, KeystrokeEvent } from '@/lib/types';
+import { calculateIntegrityScore, calculateMetrics, computeWpm, formatDuration, getScoreLabel, getSessionWritingTime } from '@/lib/metrics';
+import { isValidVerificationHash } from '@/lib/hash';
+import { buildVerifyUrl } from '@/lib/site';
+import { buildEmbedSnippets, EMBED_FORMATS, type EmbedFormat } from '@/lib/embed';
+import { buildLinkedInShareUrl, buildTweetUrl } from '@/lib/share';
+import { writeClipboard } from '@/lib/clipboard';
+import { WritingAnalysis } from '@/components/WritingAnalysis';
+import { XIcon, LinkedInIcon } from '@/components/ShareIcons';
+import { readSessionHandoff } from '@/lib/sessionHandoff';
+
+// 'notfound' — the hash is malformed, or the service answered and has no such
+// document. 'unavailable' — the service could not answer (a `503` from the API's
+// database branch, or a failed fetch). The second must never be presented as the
+// first: the document may be perfectly fine.
+type LoadError = 'notfound' | 'unavailable';
 
 interface DocumentData {
   id: string;
@@ -25,114 +39,147 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
   const { hash } = use(params);
   const [document, setDocument] = useState<DocumentData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // *Which* failure, not just that there was one. A missing document and an
+  // unreachable verification service are different claims about the same URL,
+  // and rendering "this link is invalid or the document has been removed" for
+  // the second is a lie about someone's certified work — see the `503` branch in
+  // `GET /api/documents/[hash]`. `'unavailable'` also covers the client-side
+  // failures with the same character: an offline reader, a dropped fetch.
+  const [error, setError] = useState<LoadError | null>(null);
+  // Bumped by the retry button on the `'unavailable'` state, which re-runs the
+  // load effect. A transient failure deserves a retry that costs the reader one
+  // click rather than a full page reload.
+  const [attempt, setAttempt] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackText, setPlaybackText] = useState('');
   const [playbackProgress, setPlaybackProgress] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const [embedCopied, setEmbedCopied] = useState(false);
+  const [embedFormat, setEmbedFormat] = useState<EmbedFormat>('markdown');
   const playbackRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // First check sessionStorage for recently submitted document
-    const stored = sessionStorage.getItem('lastSession');
-    if (stored) {
-      try {
-        const session = JSON.parse(stored);
-        if (session.verificationHash === hash) {
-          setDocument({
-            id: session.documentId,
-            title: session.title,
-            content: session.content,
-            wordCount: session.wordCount,
-            writingTimeMs: (session.endedAt || Date.now()) - session.startedAt,
-            verificationHash: hash,
-            status: 'certified',
-            createdAt: new Date(session.startedAt).toISOString(),
-            certifiedAt: new Date().toISOString(),
-            keystrokeData: {
-              events: session.events,
-              metrics: session.metrics,
-            },
-          });
-          setLoading(false);
-          return;
-        }
-      } catch (e) {
-        console.error('Error parsing session:', e);
-      }
+    // Mirror the server-side hash-format gate in GET /api/documents/[hash]:
+    // reject obviously-invalid hashes (a crawler hitting /verify/<garbage>, a
+    // truncated share link) before touching sessionStorage or spending an API
+    // round-trip. A real `bmoh-xxxx-xxxx-xxxx` hash always passes, so the
+    // writer's own just-certified fast-path is unaffected. Trust-boundary
+    // parity with the server, applied at the client edge.
+    if (!isValidVerificationHash(hash)) {
+      setError('notfound');
+      setLoading(false);
+      return;
     }
 
-    // Fetch from API
+    setLoading(true);
+    setError(null);
+
+    const session = readSessionHandoff(hash);
+    if (session) {
+      setDocument({
+        id: session.documentId,
+        title: session.title,
+        content: session.content,
+        wordCount: session.wordCount,
+        writingTimeMs: getSessionWritingTime(session),
+        verificationHash: hash,
+        status: 'certified',
+        createdAt: new Date(session.startedAt).toISOString(),
+        certifiedAt: new Date().toISOString(),
+        keystrokeData: {
+          events: session.events,
+          metrics: session.metrics,
+        },
+      });
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
     fetch(`/api/documents/${hash}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.error) {
-          setError(data.error);
-        } else {
+      .then(async res => {
+        // Read the outcome from the *status*, not from the presence of an
+        // `error` string: a `503` and a `404` both carry one, and only the
+        // second means "there is no such document."
+        const data = await res.json().catch(() => null);
+        if (cancelled) return;
+        if (res.ok && data?.document) {
           setDocument(data.document);
+        } else {
+          setError(res.status === 404 ? 'notfound' : 'unavailable');
         }
         setLoading(false);
       })
-      .catch(err => {
-        setError('Failed to load document');
+      .catch(() => {
+        // A failed fetch (offline, DNS, a dropped connection) says nothing
+        // about whether the document exists — same reasoning as the `503`.
+        if (cancelled) return;
+        setError('unavailable');
         setLoading(false);
       });
-  }, [hash]);
+    return () => {
+      cancelled = true;
+    };
+  }, [hash, attempt]);
 
   const startPlayback = () => {
     if (!document?.keystrokeData?.events) return;
-    
+
     setIsPlaying(true);
     setPlaybackText('');
     setPlaybackProgress(0);
 
+    const content = document.content;
     const events = document.keystrokeData.events;
-    const keyEvents = events.filter(e => e.type === 'key' || e.type === 'delete');
+    // Include `paste_internal` events — intra-editor copy/paste is explicitly
+    // allowed by the locked editor, and each one inserts `len` characters at
+    // once. Counting only `key`/`delete` left the cursor short of the real
+    // content length on any document that used internal paste, so playback
+    // ended early and then snapped to the full text.
+    const keyEvents = events.filter(
+      e => e.type === 'key' || e.type === 'delete' || e.type === 'paste_internal'
+    );
     let currentIndex = 0;
-    let currentText = '';
+    // Drive playback positionally from the certified content so cased letters,
+    // unicode, and punctuation render exactly as they were written. The
+    // keystroke trace still controls timing and the typing-vs-deletion rhythm.
+    let forwardCount = 0;
 
     const playNext = () => {
       if (currentIndex >= keyEvents.length) {
         setIsPlaying(false);
-        setPlaybackText(document.content);
+        setPlaybackText(content);
         setPlaybackProgress(100);
         return;
       }
 
       const event = keyEvents[currentIndex];
-      
+
       if (event.type === 'delete') {
-        currentText = currentText.slice(0, -1);
-      } else if (event.key) {
-        // Simulate the key press
-        if (event.key === 'Enter') {
-          currentText += '\n';
-        } else if (event.key === 'Space') {
-          currentText += ' ';
-        } else if (event.key.startsWith('Key')) {
-          currentText += event.key.charAt(3).toLowerCase();
-        } else if (event.key.startsWith('Digit')) {
-          currentText += event.key.charAt(5);
-        } else {
-          // Handle punctuation and other keys
-          const keyMap: Record<string, string> = {
-            'Period': '.', 'Comma': ',', 'Semicolon': ';',
-            'Quote': "'", 'BracketLeft': '[', 'BracketRight': ']',
-          };
-          currentText += keyMap[event.key] || '';
-        }
+        // Honor `len` the same way `paste_internal` does below. Most deletes
+        // are a single Backspace/Delete and carry no `len`, so `?? 1` keeps
+        // every existing trace replaying exactly as before — but a cut removes
+        // a whole selection at once and records the length it took out. Without
+        // this, a 16-character cut rewound the playback cursor by 1 and left
+        // the replay 15 characters ahead of the document for the rest of the
+        // session.
+        forwardCount = Math.max(0, forwardCount - (event.len ?? 1));
+      } else if (event.type === 'paste_internal') {
+        forwardCount = Math.min(content.length, forwardCount + (event.len ?? 1));
+      } else {
+        forwardCount = Math.min(content.length, forwardCount + 1);
       }
 
-      setPlaybackText(currentText);
+      setPlaybackText(content.slice(0, forwardCount));
       setPlaybackProgress(Math.round((currentIndex / keyEvents.length) * 100));
 
       currentIndex++;
-      
-      // Calculate delay to next keystroke (capped for playback speed)
+
       const nextEvent = keyEvents[currentIndex];
-      const delay = nextEvent 
-        ? Math.min(nextEvent.t - event.t, 200) // Cap at 200ms for watchable playback
+      const delay = nextEvent
+        ? Math.min(nextEvent.t - event.t, 200)
         : 0;
-      
+
       playbackRef.current = window.setTimeout(playNext, Math.max(delay / 3, 10));
     };
 
@@ -156,110 +203,270 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
     };
   }, []);
 
+  // Derive the writing metrics from the canonical keystroke trace at read time
+  // rather than trusting the `metrics` blob the client packaged into the
+  // session. The PRD's stated principle is that the trace is the canonical
+  // record and the score is derived from it at read time — but the page was
+  // reading the stored `keystrokeData.metrics` directly, so a document POSTed
+  // straight to /api/documents with an honest-looking trace but a hand-crafted
+  // `metrics` object (inflated variance, fabricated pauses) would render those
+  // numbers *and* drive the integrity score, even though the events tell a
+  // different story. Recomputing from the events closes that gap on the public
+  // proof surface. For every document minted through the editor the value is
+  // identical (the editor computes it with this same function), so this is pure
+  // hardening with no visible change on the legitimate path. Memoized on
+  // `document` so it runs once per load, not on every playback frame — playback
+  // re-renders this component every ~10–200ms and the trace can be up to the
+  // 250k-event server cap.
+  const metrics = useMemo(() => {
+    const evs = document?.keystrokeData?.events;
+    if (!Array.isArray(evs) || evs.length === 0) return undefined;
+    return calculateMetrics(evs, document!.content);
+  }, [document]);
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-cream flex items-center justify-center">
-        <div className="text-deep-blue/50">Loading verification...</div>
+        {/* role="status" + aria-live so a screen reader announces the loading
+            state on this public proof surface — the cold-visitor entry point
+            the embed flywheel targets, where the always-on accessibility
+            investment matters most. The spinner is decorative, so hide it. */}
+        <div className="flex items-center gap-3 text-deep-blue/40" role="status" aria-live="polite">
+          <div className="w-4 h-4 border-2 border-deep-blue/15 border-t-deep-blue/50 rounded-full animate-spin" aria-hidden="true" />
+          <span className="text-sm">Loading verification...</span>
+        </div>
       </div>
     );
   }
 
   if (error || !document) {
+    // Say which of the two things happened. Declaring a real proof invalid
+    // because our own database blinked is the most damaging sentence this page
+    // could print — the link may be in someone's byline, an email signature, or
+    // an embed badge on a page we will never see, and the reader has no way to
+    // tell a service outage from a fabricated certification.
+    const unavailable = error === 'unavailable';
     return (
       <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
-        <header className="flex items-center justify-between px-8 py-6 border-b border-deep-blue/10">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl">✍️</span>
+        <header className="flex items-center px-6 md:px-8 py-6 border-b border-deep-blue/[0.06]">
+          <Link href="/" className="flex items-center gap-2.5">
+            {/* Decorative — the wordmark beside it carries the same words. */}
+            <img src="/logo.svg" alt="" width="24" height="21" className="block" />
             <span className="font-semibold text-deep-blue">By My Own Hand</span>
           </Link>
         </header>
-        <main className="max-w-2xl mx-auto px-8 py-16 text-center">
-          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center text-4xl mx-auto mb-6">
-            ✕
+        <main className="max-w-2xl mx-auto px-6 md:px-8 py-16 text-center">
+          <div className="w-14 h-14 rounded-full bg-deep-blue/5 flex items-center justify-center mx-auto mb-6">
+            {/* Decorative — the heading below carries the meaning. Hidden from
+                the a11y tree like the sibling spinner and chevron icons on this
+                page. The unavailable case gets a neutral dash rather than the
+                cross: an outage is indeterminate, not a verdict. */}
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-deep-blue/30" aria-hidden="true">
+              {unavailable ? (
+                <path d="M6 12H18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              ) : (
+                <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              )}
+            </svg>
           </div>
-          <h1 className="text-2xl font-bold text-deep-blue mb-2">Document Not Found</h1>
-          <p className="text-deep-blue/60 mb-8">
-            This verification link is invalid or the document has been removed.
+          <h1 className="text-2xl font-bold text-deep-blue mb-2 tracking-tight">
+            {unavailable ? 'Verification Temporarily Unavailable' : 'Document Not Found'}
+          </h1>
+          <p className="text-deep-blue/50 mb-8">
+            {unavailable
+              ? 'We could not reach the verification service just now. This is not a judgement on the document — the link is unchanged, so please try again in a moment.'
+              : 'This verification link is invalid or the document has been removed.'}
           </p>
-          <Link
-            href="/"
-            className="inline-flex px-6 py-3 bg-deep-blue text-cream rounded-lg font-medium hover:bg-deep-blue/90 transition-colors"
-          >
-            Go Home
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            {unavailable && (
+              <button
+                onClick={() => setAttempt(n => n + 1)}
+                className="inline-flex justify-center px-6 py-3 bg-deep-blue text-cream rounded-full font-medium text-sm hover:bg-deep-blue/90 transition-colors"
+              >
+                Try again
+              </button>
+            )}
+            <Link
+              href="/"
+              className={`inline-flex justify-center px-6 py-3 rounded-full font-medium text-sm transition-colors ${
+                unavailable
+                  ? 'border border-deep-blue/15 text-deep-blue hover:bg-deep-blue/5'
+                  : 'bg-deep-blue text-cream hover:bg-deep-blue/90'
+              }`}
+            >
+              Go Home
+            </Link>
+          </div>
         </main>
       </div>
     );
   }
 
-  const metrics = document.keystrokeData?.metrics;
-  const integrityScore = metrics ? calculateIntegrityFromMetrics(metrics, document.wordCount, document.writingTimeMs) : 75;
-  const scoreInfo = getScoreLabel(integrityScore);
+  // `metrics` is derived above from the canonical trace (memoized on the
+  // document); it is defined iff the document carries a replayable trace.
+  // Whether this document carries a replayable keystroke trace. A trace-less
+  // document (a legacy record, or one whose `keystroke_data` is null) has no
+  // events to play and no evidence behind the "How we verified this" claims —
+  // so the playback panel's Play button is a dead control and the explainer's
+  // "Press Play to watch it written" / "reconstructed from the trace" lines
+  // describe evidence that isn't here. The §6.10/§6.14 honesty series already
+  // fixed the stat cells ("— / No trace") for this case; this gates the two
+  // remaining trace-dependent surfaces on the same condition.
+  const traceEvents = document.keystrokeData?.events;
+  const hasTrace = Array.isArray(traceEvents) && traceEvents.length > 0;
+  // Only compute a score when we actually have a keystroke trace to score
+  // against. Falling back to a fabricated number (we used to default to 75)
+  // makes legacy or trace-less documents look confidently certified when
+  // they carry no evidence at all.
+  const integrityScore = metrics
+    ? calculateIntegrityScore(metrics, document.wordCount, document.writingTimeMs)
+    : null;
+  const scoreInfo = integrityScore !== null ? getScoreLabel(integrityScore) : null;
+  const wpm = Math.round(computeWpm(document.wordCount, document.writingTimeMs));
+
+  const verifyUrl = buildVerifyUrl(hash);
+  const tweetText = `"${document.title}" was written by hand — every keystroke proven human.`;
+  const tweetUrl = buildTweetUrl(tweetText, verifyUrl);
+  const linkedInUrl = buildLinkedInShareUrl(verifyUrl);
+  const embeds = buildEmbedSnippets(verifyUrl, hash);
+  const embedSnippet = embeds[embedFormat];
+  const embedFormatMeta = EMBED_FORMATS.find(f => f.id === embedFormat)!;
+
+  const copyVerifyUrl = async () => {
+    if (!(await writeClipboard(verifyUrl))) return;
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyEmbed = async () => {
+    if (!(await writeClipboard(embedSnippet))) return;
+    setEmbedCopied(true);
+    setTimeout(() => setEmbedCopied(false), 2000);
+  };
 
   return (
     <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-cream">
       {/* Header */}
-      <header className="flex items-center justify-between px-8 py-6 border-b border-deep-blue/10">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="text-xl">✍️</span>
+      <header className="flex items-center justify-between px-6 md:px-8 py-6 border-b border-deep-blue/[0.06]">
+        <Link href="/" className="flex items-center gap-2.5">
+          {/* Decorative — the wordmark beside it carries the same words. */}
+          <img src="/logo.svg" alt="" width="24" height="21" className="block" />
           <span className="font-semibold text-deep-blue">By My Own Hand</span>
         </Link>
-        <span className="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full">
-          ✓ Verified
-        </span>
+        <div className="flex items-center gap-2 text-success">
+          {/* Decorative — the adjacent "Verified" label is the meaning. */}
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M4 8L7 11L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span className="text-sm font-medium">Verified</span>
+        </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-8 py-12">
-        {/* Verified badge */}
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-            <span className="text-3xl">✓</span>
+      <main className="max-w-3xl mx-auto px-6 md:px-8 py-12">
+        {/* Document header */}
+        <div className="flex items-start gap-4 mb-10">
+          <div className="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+            {/* Decorative — the document title and the "Certified as
+                authentically human-written" line beside it carry the meaning. */}
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-success" aria-hidden="true">
+              <path d="M6 10L9 13L14 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-deep-blue">{document.title}</h1>
-            <p className="text-deep-blue/60">
-              Certified as authentically human-written
-            </p>
+            <h1 className="text-2xl font-bold text-deep-blue tracking-tight">{document.title}</h1>
+            <p className="text-deep-blue/45 mt-1">Certified as authentically human-written</p>
           </div>
         </div>
 
-        {/* Stats bar */}
-        <div className="grid grid-cols-4 gap-4 mb-8 p-4 bg-white rounded-xl border border-deep-blue/10">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-deep-blue">{document.wordCount}</div>
-            <div className="text-sm text-deep-blue/50">Words</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-deep-blue">{formatDuration(document.writingTimeMs)}</div>
-            <div className="text-sm text-deep-blue/50">Duration</div>
-          </div>
-          <div className="text-center">
-            <div className={`text-2xl font-bold ${scoreInfo.color}`}>{integrityScore}</div>
-            <div className="text-sm text-deep-blue/50">Authenticity</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-deep-blue">{metrics?.blockedPastes || 0}</div>
-            <div className="text-sm text-deep-blue/50">Pastes Blocked</div>
+        {/* Stats */}
+        <div className="bg-white rounded-2xl border border-deep-blue/[0.06] overflow-hidden mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-deep-blue/[0.04]">
+            <div className="bg-white text-center p-5">
+              <div className="text-2xl font-bold text-deep-blue mb-0.5">{document.wordCount}</div>
+              <div className="text-xs text-deep-blue/35 uppercase tracking-wider">Words</div>
+            </div>
+            <div className="bg-white text-center p-5">
+              <div className="text-2xl font-bold text-deep-blue mb-0.5">{formatDuration(document.writingTimeMs)}</div>
+              <div className="text-xs text-deep-blue/35 uppercase tracking-wider">Duration</div>
+            </div>
+            <div className="bg-white text-center p-5">
+              {integrityScore !== null && scoreInfo ? (
+                <>
+                  <div className={`text-2xl font-bold ${scoreInfo.color} mb-0.5`}>{integrityScore}</div>
+                  <div className="text-xs text-deep-blue/35 uppercase tracking-wider">{scoreInfo.label}</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-deep-blue/30 mb-0.5">—</div>
+                  <div className="text-xs text-deep-blue/35 uppercase tracking-wider">No trace</div>
+                </>
+              )}
+            </div>
+            <div className="bg-white text-center p-5">
+              {metrics ? (
+                <>
+                  <div className="text-2xl font-bold text-deep-blue mb-0.5">{metrics.blockedPastes}</div>
+                  <div className="text-xs text-deep-blue/35 uppercase tracking-wider">Pastes Blocked</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-deep-blue/30 mb-0.5">—</div>
+                  <div className="text-xs text-deep-blue/35 uppercase tracking-wider">No trace</div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Writing playback */}
-        <div className="bg-white rounded-xl border border-deep-blue/10 overflow-hidden mb-8">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-deep-blue/10 bg-deep-blue/5">
-            <span className="text-sm font-medium text-deep-blue">Writing Playback</span>
+        {/* Writing playback — only when a replayable trace exists. For a
+            trace-less document the Play button does nothing (startPlayback
+            returns early on no events), so rendering the panel presents a dead
+            control. */}
+        {hasTrace && (
+        <div className="bg-white rounded-2xl border border-deep-blue/[0.06] overflow-hidden mb-8">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-deep-blue/[0.04]">
+            <span className="text-xs font-semibold text-deep-blue/35 uppercase tracking-wider">Writing Playback</span>
             <div className="flex items-center gap-3">
               {playbackProgress > 0 && playbackProgress < 100 && (
-                <span className="text-sm text-deep-blue/50">{playbackProgress}%</span>
+                <span
+                  className="text-xs text-deep-blue/35 tabular-nums font-mono"
+                  role="progressbar"
+                  aria-label="Writing playback progress"
+                  aria-valuenow={playbackProgress}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  {playbackProgress}%
+                </span>
               )}
+              {/* Dynamic aria-label gives the icon-light control context for a
+                  screen reader while keeping the visible word ("Play"/"Stop")
+                  inside the accessible name (WCAG 2.5.3, Label in Name). */}
               <button
                 onClick={isPlaying ? stopPlayback : startPlayback}
-                className="px-4 py-1.5 bg-deep-blue text-cream text-sm font-medium rounded-lg hover:bg-deep-blue/90 transition-colors"
+                aria-label={isPlaying ? 'Stop writing playback' : 'Play writing playback'}
+                className="px-4 py-1.5 bg-deep-blue text-cream text-xs font-medium rounded-full hover:bg-deep-blue/90 transition-colors"
               >
                 {isPlaying ? 'Stop' : 'Play'}
               </button>
             </div>
           </div>
-          <div className="p-6 min-h-[200px] max-h-[400px] overflow-y-auto font-mono text-sm whitespace-pre-wrap">
+          {/* Keyboard-reachable scrollable region. The content is capped at
+              max-h-[400px] with overflow-y-auto, so a long certified piece
+              scrolls inside this box — but with no focusable element the
+              remainder was mouse-wheel/drag-only (WCAG 2.1.1 / the Lighthouse
+              "scrollable region must have keyboard access" audit, the same gap
+              the embed-snippet fix closed). tabIndex={0} makes it a tab stop the
+              arrow keys scroll; role="group" + aria-label give a screen reader
+              something to announce on arrival. Matters on this cold-visitor
+              proof surface, where a reader who can't use a mouse still needs to
+              read the whole piece being verified. */}
+          <div
+            tabIndex={0}
+            role="group"
+            aria-label="Certified document text"
+            className="p-6 min-h-[200px] max-h-[400px] overflow-y-auto text-[0.95rem] leading-relaxed whitespace-pre-wrap text-deep-blue/80"
+          >
             {isPlaying ? (
               <>
                 {playbackText}
@@ -270,66 +477,195 @@ export default function VerifyPage({ params }: { params: Promise<{ hash: string 
             )}
           </div>
         </div>
+        )}
+
+        {/* How we verified this — a calm explainer for first-time visitors who
+            arrived via a shared link or an embed badge and may not know what a
+            keystroke trace actually proves. Phase 1.5 item: educating the cold
+            visitor is the first step in converting an embed touch into a writer
+            of their own (the embed flywheel the "Write your own proof" CTA
+            below closes). A native <details> adds no JS and is keyboard- and
+            screen-reader-accessible by default. Gated on `hasTrace`: the panel
+            references "shown above" and "Press Play" and asserts the timing was
+            "reconstructed from the trace," so it must not render for a
+            trace-less document where neither the playback nor that evidence
+            exists. */}
+        {hasTrace && (
+        <details className="group bg-white rounded-2xl border border-deep-blue/[0.06] mb-8 overflow-hidden">
+          <summary className="flex items-center justify-between px-5 md:px-6 py-4 cursor-pointer list-none select-none">
+            <span className="text-sm font-semibold text-deep-blue">How we verified this</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-deep-blue/40 transition-transform group-open:rotate-180" aria-hidden="true">
+              <path d="M4 6L8 10L12 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </summary>
+          <div className="px-5 md:px-6 pb-6 pt-1 space-y-4 text-sm text-deep-blue/55 leading-relaxed border-t border-deep-blue/[0.04]">
+            <p>
+              This piece was composed in a locked editor that recorded every keystroke with millisecond timing — we certify the act of writing, not the finished text alone.
+            </p>
+            <ul className="space-y-2.5">
+              <li className="flex gap-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-deep-blue/20 flex-shrink-0 mt-[0.5rem]" />
+                <span><span className="font-medium text-deep-blue/70">Every keystroke is timed.</span> The rhythm, thinking pauses, and corrections shown above are reconstructed from the trace, not estimated.</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-deep-blue/20 flex-shrink-0 mt-[0.5rem]" />
+                <span><span className="font-medium text-deep-blue/70">External paste is blocked.</span> Text pasted from outside the editor is rejected and counted — the words had to originate here.</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-deep-blue/20 flex-shrink-0 mt-[0.5rem]" />
+                <span><span className="font-medium text-deep-blue/70">Press Play to watch it written.</span> The playback replays the document character by character at the pace it was actually composed.</span>
+              </li>
+            </ul>
+            <p className="text-deep-blue/45">
+              We capture timing only — never your screen, webcam, or biometrics.
+            </p>
+          </div>
+        </details>
+        )}
 
         {/* Detailed metrics */}
         {metrics && (
-          <div className="bg-white rounded-xl border border-deep-blue/10 p-6">
-            <h3 className="text-lg font-semibold text-deep-blue mb-4">Writing Analysis</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-              <MetricItem label="Avg Keystroke" value={`${metrics.avgKeystrokeInterval}ms`} />
-              <MetricItem label="Variance" value={metrics.keystrokeVariance.toFixed(2)} />
-              <MetricItem label="Thinking Pauses" value={metrics.pauseCount} />
-              <MetricItem label="Deletion Rate" value={`${(metrics.deletionRate * 100).toFixed(1)}%`} />
-              <MetricItem label="Longest Burst" value={`${metrics.longestBurst} chars`} />
-              <MetricItem 
-                label="WPM" 
-                value={Math.round((document.wordCount / document.writingTimeMs) * 60000)} 
-              />
-            </div>
+          <div className="mb-8">
+            <WritingAnalysis metrics={metrics} wpm={wpm} />
           </div>
         )}
 
+        {/* Share + embed */}
+        <div className="bg-white rounded-2xl border border-deep-blue/[0.06] p-6 md:p-8 mb-8">
+          <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em] mb-4">
+            Share this proof
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 mb-6">
+            <button
+              onClick={copyVerifyUrl}
+              className="flex-1 flex items-center justify-center gap-2 px-5 py-3 border border-deep-blue/15 text-deep-blue rounded-full font-medium text-sm hover:bg-deep-blue/5 transition-colors"
+            >
+              {copied ? (
+                <>
+                  {/* Decorative — the button's own "Link copied" / "Copy link"
+                      text is the accessible name. */}
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M4 8L7 11L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Link copied
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <rect x="5" y="5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M11 3H4C3.44772 3 3 3.44772 3 4V11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                  Copy link
+                </>
+              )}
+            </button>
+            <a
+              href={tweetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-2 px-5 py-3 border border-deep-blue/15 text-deep-blue rounded-full font-medium text-sm hover:bg-deep-blue/5 transition-colors"
+            >
+              <XIcon />
+              Post on X
+            </a>
+            <a
+              href={linkedInUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-2 px-5 py-3 border border-deep-blue/15 text-deep-blue rounded-full font-medium text-sm hover:bg-deep-blue/5 transition-colors"
+            >
+              <LinkedInIcon />
+              LinkedIn
+            </a>
+          </div>
+
+          {/* Wraps rather than overflows — see the matching comment on
+              /success; four formats no longer fit beside the label on a phone. */}
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <p className="text-xs font-semibold text-deep-blue/30 uppercase tracking-[0.2em]">
+              Embed badge
+            </p>
+            {/* A format switcher, not a tab set: `role="tab"`/`tablist` promises
+                a tabpanel relationship (`aria-controls`), roving tabindex, and
+                arrow-key navigation that this control doesn't implement, so a
+                screen reader announced "tab, 1 of 2" and offered tab semantics
+                that went nowhere. `aria-pressed` toggle buttons describe what
+                these actually are — two mutually-exclusive on/off toggles that
+                swap the snippet below. Accessibility-honesty sibling of the
+                §6.39 playback-control and §6.29 verification-link a11y fixes. */}
+            <div className="flex items-center gap-1 p-0.5 bg-deep-blue/[0.04] rounded-full" role="group" aria-label="Embed format">
+              {EMBED_FORMATS.map(format => (
+                <button
+                  key={format.id}
+                  aria-pressed={embedFormat === format.id}
+                  onClick={() => setEmbedFormat(format.id)}
+                  className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                    embedFormat === format.id ? 'bg-deep-blue text-cream' : 'text-deep-blue/50 hover:text-deep-blue'
+                  }`}
+                >
+                  {format.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-stretch gap-3">
+            {/* Keyboard-reachable scrollable region — see the matching comment
+                on /success. The snippet overflows its box horizontally, so
+                without a tab stop the remainder was mouse-drag-only (WCAG
+                2.1.1). It matters a little more here: /verify is the cold
+                visitor's entry point, where a reader who arrived from someone
+                else's badge copies their first one. */}
+            <code
+              tabIndex={0}
+              role="group"
+              aria-label={`${embedFormatMeta.label} embed badge snippet`}
+              className="flex-1 px-3 py-2.5 bg-deep-blue/[0.04] rounded-lg text-xs font-mono text-deep-blue/70 overflow-x-auto whitespace-nowrap"
+            >
+              {embedSnippet}
+            </code>
+            <button
+              onClick={copyEmbed}
+              className="px-4 py-2.5 bg-deep-blue text-cream rounded-lg font-medium text-xs hover:bg-deep-blue/90 transition-colors flex items-center gap-2"
+            >
+              {embedCopied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <p className="text-xs text-deep-blue/35 mt-3">
+            {embedFormatMeta.hint}
+          </p>
+        </div>
+
         {/* Verification hash */}
-        <div className="mt-8 p-4 bg-deep-blue/5 rounded-lg text-center">
-          <span className="text-xs text-deep-blue/50 uppercase tracking-wider">Verification Hash</span>
-          <p className="font-mono text-deep-blue">{hash}</p>
+        <div className="pt-8 border-t border-deep-blue/[0.06] text-center">
+          <span className="text-xs text-deep-blue/30 uppercase tracking-wider">Verification Hash</span>
+          <p className="font-mono text-sm text-deep-blue/60 mt-1 break-all">{hash}</p>
+        </div>
+
+        {/* Visitor CTA — every /verify pageload is a cold embed touch (a reader
+            arriving from a Substack post, a WordPress blog, an email signature
+            badge). Closing the embed flywheel means converting some fraction of
+            those visitors into writers themselves, but the page previously had
+            no path forward for a verifier — only a verification hash, then the
+            footer. A calm "Try it yourself" line completes the loop the
+            Phase 1.3 embed badge initiates: badge in the wild → cold visit to
+            /verify → writer's-own certified piece → another badge in the wild.
+            Sticks alongside the future Phase 1.5 "How we verified this"
+            explainer rather than replacing it. */}
+        <div className="mt-12 text-center">
+          <p className="text-deep-blue/50 text-sm mb-4">
+            Want proof your own writing is human?
+          </p>
+          <Link
+            href="/write"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-deep-blue text-cream rounded-full font-medium text-sm hover:bg-deep-blue/90 transition-colors"
+          >
+            Write your own proof
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
         </div>
       </main>
     </div>
   );
-}
-
-function MetricItem({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div>
-      <span className="text-sm text-deep-blue/50">{label}</span>
-      <p className="text-lg font-medium text-deep-blue">{value}</p>
-    </div>
-  );
-}
-
-function getScoreLabel(score: number) {
-  if (score >= 90) return { label: 'Excellent', color: 'text-green-600' };
-  if (score >= 70) return { label: 'Good', color: 'text-blue-600' };
-  if (score >= 50) return { label: 'Moderate', color: 'text-yellow-600' };
-  return { label: 'Low', color: 'text-red-600' };
-}
-
-function calculateIntegrityFromMetrics(metrics: WritingMetrics, wordCount: number, writingTimeMs: number): number {
-  let score = 100;
-  
-  if (metrics.blockedPastes > 0) {
-    score -= Math.min(30, metrics.blockedPastes * 10);
-  }
-  
-  const wpm = (wordCount / writingTimeMs) * 60000;
-  if (wpm > 150) score -= 20;
-  else if (wpm > 200) score -= 40;
-  
-  if (metrics.keystrokeVariance < 0.1) score -= 15;
-  if (metrics.pauseCount === 0 && wordCount > 100) score -= 10;
-  if (metrics.deletionRate === 0 && wordCount > 50) score -= 5;
-  else if (metrics.deletionRate > 0.3) score -= 10;
-  
-  return Math.max(0, Math.min(100, score));
 }

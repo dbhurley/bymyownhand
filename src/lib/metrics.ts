@@ -1,10 +1,90 @@
 import type { KeystrokeEvent, WritingMetrics } from './types';
 
-export function calculateMetrics(events: KeystrokeEvent[]): WritingMetrics {
-  const keyEvents = events.filter(e => e.type === 'key');
-  const deleteEvents = events.filter(e => e.type === 'delete');
-  const blockedPastes = events.filter(e => e.type === 'paste_blocked').length;
-  
+// Single source of truth for the word-counting rule used across the editor's
+// live counter, the API submission gate, the resume-banner draft summary, and
+// metric calculation. Trimming + collapsing whitespace + dropping empty tokens
+// is the contract; consolidating it here keeps the 10-word threshold and the
+// `averageWordLength` denominator in lockstep.
+export function countWords(content: string): number {
+  // Defer to splitWords() so the trim + collapse-whitespace + drop-empty-tokens
+  // rule lives in exactly one place. Both functions previously inlined the same
+  // `trim().split(/\s+/).filter(Boolean)` contract, so a future change to the
+  // splitting rule (e.g. a different whitespace class, or treating em-dashes as
+  // separators) had two copies to keep in lockstep — and countWords is the
+  // 10-word certification gate while splitWords feeds the averageWordLength
+  // denominator, so a drift between them would desync the two. Same cost (both
+  // allocate the token array) and same drift-prevention shape as the prior
+  // getScoreLabel / computeWpm / getSessionWritingTime consolidations.
+  return splitWords(content).length;
+}
+
+export function splitWords(content: string): string[] {
+  if (!content) return [];
+  const trimmed = content.trim();
+  if (!trimmed) return [];
+  return trimmed.split(/\s+/).filter(Boolean);
+}
+
+const KEYSTROKE_EVENT_TYPES = new Set<KeystrokeEvent['type']>([
+  'key',
+  'delete',
+  'paste_blocked',
+  'paste_internal',
+]);
+
+// Single source of truth for what a well-formed KeystrokeEvent looks like,
+// enforced at the `POST /api/documents` write boundary. The route already
+// checked that `session.events` is a non-empty array under the 250k cap, but
+// never what was *in* it — so the two failure modes below both reached the
+// canonical record:
+//
+//   - `events: [null]` threw a TypeError on `e.type` inside `calculateMetrics()`
+//     and landed in the route's outer catch as `500 Failed to create document`:
+//     a server-error status (and a `console.error`) for what is squarely a
+//     client error. Same mis-typed-status bug the prior revision fixed for
+//     `title: 123`, one field further in.
+//   - `events: [{ t: 'abc', … }]` was accepted outright. Every interval derived
+//     from it is NaN, so the persisted `keystroke_data.metrics` stores nulls
+//     (JSON has no NaN) and `/verify/<hash>` — which recomputes from the trace
+//     at read time — renders "NaN" in the writing-analysis panel of a document
+//     it is presenting as certified proof.
+//
+// `t` and `type` drive all the timing math and the event classification; `len`
+// additionally advances the playback cursor on `/verify` (`event.len ?? 1`), so
+// a non-finite one desyncs the replay from the certified content. `pos` is
+// recorded but never read by any computation, so it is checked for type without
+// a range constraint. `t` is deliberately *not* required to be non-negative: a
+// clock corrected backwards mid-session can legitimately produce one, and
+// failing a real writer's certification over it would be worse than the skewed
+// interval it causes. Same trust-boundary shape as `isValidRecord()` in
+// `lib/history.ts` and the strict draft-snapshot check in `lib/draft.ts`.
+export function isValidKeystrokeEvent(value: unknown): value is KeystrokeEvent {
+  if (!value || typeof value !== 'object') return false;
+  const e = value as Record<string, unknown>;
+  return (
+    Number.isFinite(e.t) &&
+    KEYSTROKE_EVENT_TYPES.has(e.type as KeystrokeEvent['type']) &&
+    Number.isFinite(e.pos) &&
+    (e.key === undefined || typeof e.key === 'string') &&
+    (e.len === undefined || (Number.isFinite(e.len) && (e.len as number) >= 0))
+  );
+}
+
+export function calculateMetrics(events: KeystrokeEvent[], content = ''): WritingMetrics {
+  // Classify the trace in a single pass rather than three separate `.filter()`
+  // sweeps. The trace can be large (up to the 250k-event server cap), so walking
+  // it once instead of three times keeps `/verify/<hash>` playback setup and the
+  // certificate metrics cheap. Only `keyEvents` needs to be materialized as an
+  // ordered array (for interval timing); deletes and blocked pastes need counts.
+  const keyEvents: KeystrokeEvent[] = [];
+  let deleteCount = 0;
+  let blockedPastes = 0;
+  for (const e of events) {
+    if (e.type === 'key') keyEvents.push(e);
+    else if (e.type === 'delete') deleteCount++;
+    else if (e.type === 'paste_blocked') blockedPastes++;
+  }
+
   // Calculate keystroke intervals
   const intervals: number[] = [];
   for (let i = 1; i < keyEvents.length; i++) {
@@ -19,19 +99,31 @@ export function calculateMetrics(events: KeystrokeEvent[]): WritingMetrics {
   const variance = intervals.length > 0
     ? intervals.reduce((sum, val) => sum + Math.pow(val - avgKeystrokeInterval, 2), 0) / intervals.length
     : 0;
-  const keystrokeVariance = Math.sqrt(variance) / (avgKeystrokeInterval || 1);
+  // Coefficient of variation is a magnitude and must not become negative.
+  // `isValidKeystrokeEvent()` deliberately permits a negative timestamp when a
+  // device clock is corrected backwards mid-session; enough skew can make the
+  // mean interval negative even though the standard deviation is positive. The
+  // former signed denominator then produced a negative CoV, automatically
+  // tripping the `< 0.1` robotic-rhythm penalty and failing the browser-handoff
+  // schema for an otherwise valid session. Preserve the skewed timing evidence,
+  // but divide by the mean's magnitude so the metric keeps its defined range.
+  const keystrokeVariance = Math.sqrt(variance) / (Math.abs(avgKeystrokeInterval) || 1);
   
   // Count pauses (intervals > 2000ms)
   const pauseCount = intervals.filter(i => i > 2000).length;
   
   // Deletion rate
-  const totalKeystrokes = keyEvents.length + deleteEvents.length;
-  const deletionRate = totalKeystrokes > 0 
-    ? deleteEvents.length / totalKeystrokes 
+  const totalKeystrokes = keyEvents.length + deleteCount;
+  const deletionRate = totalKeystrokes > 0
+    ? deleteCount / totalKeystrokes
     : 0;
   
-  // Longest burst (consecutive keystrokes < 500ms apart)
-  let longestBurst = 0;
+  // Longest burst (consecutive keystrokes < 500ms apart). Floor at 1 whenever
+  // any keys were typed: a deliberate writer whose every keystroke is >500ms
+  // apart still produced a "burst" of one character — reporting 0 chars there
+  // (on the certificate and the verify panel) was wrong, and ironically made
+  // the most careful human writers look like they typed nothing.
+  let longestBurst = keyEvents.length > 0 ? 1 : 0;
   let currentBurst = 1;
   for (const interval of intervals) {
     if (interval < 500) {
@@ -42,9 +134,12 @@ export function calculateMetrics(events: KeystrokeEvent[]): WritingMetrics {
     }
   }
   
-  // Average word length (rough estimate from final content)
-  const averageWordLength = 5; // Will be calculated from content separately
-  
+  // Average word length, derived from the final content
+  const words = splitWords(content);
+  const averageWordLength = words.length > 0
+    ? Math.round((words.reduce((sum, w) => sum + w.length, 0) / words.length) * 10) / 10
+    : 0;
+
   return {
     avgKeystrokeInterval: Math.round(avgKeystrokeInterval),
     keystrokeVariance: Math.round(keystrokeVariance * 100) / 100,
@@ -56,20 +151,34 @@ export function calculateMetrics(events: KeystrokeEvent[]): WritingMetrics {
   };
 }
 
+// Single source of truth for the WPM calculation. The
+// `writingTimeMs > 0 ? (wordCount / writingTimeMs) * 60000 : 0` pattern was
+// duplicated four times — `/success/<hash>`, `/verify/<hash>`, the certificate
+// PDF, and the integrity-score branches here — with one variant rounded for
+// display and one raw for the >150/>200 threshold checks. Consolidating into
+// one helper keeps the math (and the divide-by-zero guard from §6.8) in lockstep
+// across every surface. Drift-prevention sibling of the prior `getScoreLabel` /
+// `countWords` / `buildEmbedSnippets` / `getSiteUrl` / `buildVerifyUrl`
+// consolidations. Display sites round the result.
+export function computeWpm(wordCount: number, writingTimeMs: number): number {
+  if (writingTimeMs <= 0) return 0;
+  return (wordCount / writingTimeMs) * 60000;
+}
+
 export function calculateIntegrityScore(metrics: WritingMetrics, wordCount: number, writingTimeMs: number): number {
   let score = 100;
-  
+
   // Penalize if blocked pastes occurred
   if (metrics.blockedPastes > 0) {
     score -= Math.min(30, metrics.blockedPastes * 10);
   }
-  
+
   // Check if typing speed is humanly plausible (40-150 WPM typical)
-  const wpm = (wordCount / writingTimeMs) * 60000;
-  if (wpm > 150) {
-    score -= 20; // Suspiciously fast
-  } else if (wpm > 200) {
+  const wpm = computeWpm(wordCount, writingTimeMs);
+  if (wpm > 200) {
     score -= 40; // Almost certainly not human-typed
+  } else if (wpm > 150) {
+    score -= 20; // Suspiciously fast
   }
   
   // Natural typing has variance
@@ -92,11 +201,54 @@ export function calculateIntegrityScore(metrics: WritingMetrics, wordCount: numb
   return Math.max(0, Math.min(100, score));
 }
 
+export interface ScoreLabel {
+  label: string;
+  color: string;
+}
+
+export function getScoreLabel(score: number): ScoreLabel {
+  if (score >= 90) return { label: 'Excellent', color: 'text-success' };
+  if (score >= 70) return { label: 'Good', color: 'text-accent' };
+  if (score >= 50) return { label: 'Moderate', color: 'text-warning' };
+  return { label: 'Low', color: 'text-red-600' };
+}
+
+// Single source of truth for deriving a session's writing-time-in-ms from the
+// in-app `WritingSession` payload that lives in `sessionStorage` on /success
+// and /verify. The `(endedAt || Date.now()) - startedAt` pattern was duplicated
+// on both pages and silently disagrees with the server-side `writingTimeMs`
+// whenever `endedAt` is missing — the `Date.now()` fallback resolves to "now,"
+// which on a refreshed `/verify` tab can be hours after the session ended,
+// ballooning the Duration cell and WPM. Applies the same `Number.isFinite()` /
+// non-negative clamp as `formatDuration()` so a corrupt sessionStorage payload
+// (or a future caller passing partial data) can never surface as a negative or
+// NaN duration. Drift-prevention sibling of the prior `computeWpm()` /
+// `getScoreLabel()` / `countWords()` / `buildEmbedSnippets()` consolidations.
+export function getSessionWritingTime(session: {
+  startedAt: number | undefined;
+  endedAt?: number;
+}): number {
+  const startedAt = Number(session.startedAt);
+  if (!Number.isFinite(startedAt) || startedAt <= 0) return 0;
+  const endedAt = Number(session.endedAt);
+  const end = Number.isFinite(endedAt) && endedAt > 0 ? endedAt : Date.now();
+  const window = end - startedAt;
+  return Number.isFinite(window) && window > 0 ? window : 0;
+}
+
 export function formatDuration(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
+  // Clamp non-finite or negative inputs to 0. Without this, a legacy or
+  // tampered record with `writingTimeMs = NaN` (or negative — a clock that
+  // ran backwards between startedAt and endedAt before the §6.20 server-side
+  // sanitization landed) renders as "NaNs" / "-1s" in the verify Duration cell,
+  // the success page, the certificate PDF, and the toolbar timer. Match the
+  // shape of the server-side `writingTimeMs` trust-boundary fix (§6.20) on the
+  // display side so a single bad value can't surface anywhere.
+  const safeMs = Number.isFinite(ms) && ms > 0 ? ms : 0;
+  const seconds = Math.floor(safeMs / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes % 60}m`;
   } else if (minutes > 0) {

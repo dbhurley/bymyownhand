@@ -1,0 +1,17 @@
+# ByMyOwnHand
+
+> Certify your writing was created by human hands, keystroke by keystroke.
+
+ByMyOwnHand is built by David Hurley (https://dbhurley.com), founder of Plasmate Labs and creator of the Adaptive Convergence Protocol (ACP).
+
+## About
+ByMyOwnHand is a writing authenticity certification platform. Writers compose in a locked-down editor that captures every keystroke with precise timing data, blocking external paste and AI assistance. The platform analyzes typing speed, pause patterns, edit behavior, and keystroke rhythm to calculate an authenticity score, then issues a verifiable certificate with a unique hash and shareable verification link proving the work is genuinely human-authored.
+
+## Links
+- Website: https://bymyownhand.com
+- Founder: https://dbhurley.com
+- Founder blog: https://dbhurley.com/blog
+- Ventures: https://dbhurley.com/startups
+
+## Part of the DBH Ventures portfolio
+https://dbhurley.com/startups

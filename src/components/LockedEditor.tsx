@@ -2,29 +2,83 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
-import type { KeystrokeEvent, WritingSession } from '@/lib/types';
-import { calculateMetrics, calculateIntegrityScore, formatDuration } from '@/lib/metrics';
+import { MAX_DOCUMENT_TITLE_LENGTH, type KeystrokeEvent, type WritingSession } from '@/lib/types';
+import { calculateMetrics, calculateIntegrityScore, countWords, formatDuration } from '@/lib/metrics';
+import { clearDraft, saveDraft, type DraftSnapshot } from '@/lib/draft';
 import { nanoid } from 'nanoid';
 
 interface LockedEditorProps {
-  onComplete: (session: WritingSession) => void;
+  // Resolves `true` once the session is actually certified, `false` if the
+  // submission failed. The editor keeps autosaving — and keeps the writer's
+  // localStorage draft — until it hears a definite `true`.
+  onComplete: (session: WritingSession) => Promise<boolean>;
   title: string;
   onTitleChange: (title: string) => void;
+  initialDraft?: DraftSnapshot | null;
+  // Parent's POST /api/documents in flight. Disables the Complete button so a
+  // rapid double-click can't fire two onComplete calls — which used to produce
+  // two verification hashes for the same writing session and race on the
+  // /success/<hash> redirect (sessionStorage.lastSession pointed at one hash,
+  // URL bar showed the other, success page's hash-match check then bounced
+  // the writer to /verify). When the parent's submission errors out, it
+  // resets isSubmitting and the writer can retry.
+  isSubmitting?: boolean;
 }
 
-export default function LockedEditor({ onComplete, title, onTitleChange }: LockedEditorProps) {
-  const [content, setContent] = useState('');
+export default function LockedEditor({ onComplete, title, onTitleChange, initialDraft, isSubmitting = false }: LockedEditorProps) {
+  const [content, setContent] = useState(initialDraft?.content ?? '');
   const [wordCount, setWordCount] = useState(0);
-  const [sessionId] = useState(() => nanoid());
-  const [startTime] = useState(() => Date.now());
+  const [sessionId] = useState(() => initialDraft?.sessionId ?? nanoid());
+  // Rebase the session's logical start when resuming a draft so the wall-clock
+  // gap between the last saved event and the first resumed keystroke doesn't
+  // count as a multi-hour "pause." Keystroke events use `t = Date.now() - startTime`,
+  // so anchoring `startTime` at `Date.now() - lastEventT - 1ms` makes the first
+  // resumed event land 1ms after the last saved one — preserving the writing
+  // session as one continuous trace. Without this, a draft resumed 23h later
+  // inflated `avgKeystrokeInterval` by ~80M ms, added a bogus pause to
+  // `pauseCount`, and the elapsed-time display showed "23h" instead of the
+  // actual writing time. The original `startedAt` is preserved separately so
+  // the certified record still reports the real wall-clock start.
+  const [startTime] = useState(() => {
+    if (!initialDraft) return Date.now();
+    const lastEventT = initialDraft.events.reduce<number>((max, ev) => ev.t > max ? ev.t : max, 0);
+    return Date.now() - lastEventT - 1;
+  });
+  const [startedAt] = useState(() => initialDraft?.startTime ?? Date.now());
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [blockedPasteCount, setBlockedPasteCount] = useState(0);
-  const [isRecording, setIsRecording] = useState(true);
-  
-  const eventsRef = useRef<KeystrokeEvent[]>([]);
+  const [blockedPasteCount, setBlockedPasteCount] = useState(() => initialDraft?.blockedPasteCount ?? 0);
+
+  // A blocked paste used to be silent at the point of action: the toolbar's
+  // "N pastes blocked" counter appears at the top of the screen while the
+  // writer's attention is on the cursor, so pressing Cmd+V and having nothing
+  // appear reads as a broken editor rather than the lockdown working as
+  // designed. Flash a brief, calm explanation where the writing is happening —
+  // the block is the product's core promise, so it should be legible the moment
+  // it fires, not inferred from a counter. `role="status"` + `aria-live` so a
+  // screen-reader user hears it too (a blocked paste is otherwise entirely
+  // invisible to assistive tech).
+  const [pasteBlockedNotice, setPasteBlockedNotice] = useState(false);
+  const pasteNoticeTimer = useRef<number | null>(null);
+  const flashPasteBlocked = useCallback(() => {
+    setPasteBlockedNotice(true);
+    if (pasteNoticeTimer.current) window.clearTimeout(pasteNoticeTimer.current);
+    pasteNoticeTimer.current = window.setTimeout(() => setPasteBlockedNotice(false), 3000);
+  }, []);
+  useEffect(() => () => {
+    if (pasteNoticeTimer.current) window.clearTimeout(pasteNoticeTimer.current);
+  }, []);
+
+  const eventsRef = useRef<KeystrokeEvent[]>(initialDraft?.events ?? []);
   const internalClipboard = useRef<string>('');
-  const editorRef = useRef<any>(null);
-  const lastContentRef = useRef<string>('');
+  // Detaches the window-level clipboard/drag guards installed on mount — see
+  // `handleEditorMount`. They outlive the editor's own DOM node, so unlike the
+  // node-scoped listeners they replaced, they have to be removed explicitly.
+  const detachGuardsRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => detachGuardsRef.current?.(), []);
+  // Type the editor ref from the OnMount callback's own first parameter rather
+  // than `any`, so the ref reflects the real Monaco editor instance type without
+  // pulling in a direct `monaco-editor` import.
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
 
   // Update elapsed time every second
   useEffect(() => {
@@ -36,8 +90,7 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
 
   // Calculate word count
   useEffect(() => {
-    const words = content.trim().split(/\s+/).filter(w => w.length > 0);
-    setWordCount(words.length);
+    setWordCount(countWords(content));
   }, [content]);
 
   const recordEvent = useCallback((event: Omit<KeystrokeEvent, 't'>) => {
@@ -45,34 +98,139 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
     eventsRef.current.push({ ...event, t });
   }, [startTime]);
 
-  const handleEditorMount: OnMount = (editor, monaco) => {
+  const handleEditorMount: OnMount = (editor) => {
     editorRef.current = editor;
-    
+
+    // Remember the current selection as the editor's own clipboard, so a later
+    // Cmd+V of the writer's own text is recognised as an internal paste rather
+    // than counted as a blocked external one. Returns the selection so the cut
+    // path can record what it removed.
+    const syncInternalClipboard = (): { text: string; pos: number } => {
+      const selection = editor.getSelection();
+      if (!selection || selection.isEmpty()) return { text: '', pos: 0 };
+      const text = editor.getModel()?.getValueInRange(selection) ?? '';
+      if (text) internalClipboard.current = text;
+      return { text, pos: selection.startColumn };
+    };
+
+    const selectionLength = (): number => {
+      const selection = editor.getSelection();
+      if (!selection || selection.isEmpty()) return 0;
+      return editor.getModel()?.getValueInRange(selection).length ?? 0;
+    };
+
+    // How many characters the keystroke currently being processed is about to
+    // replace. Typing over a selection — including the select-all-and-retype
+    // that starts many rewrites — removes the whole selection and inserts one
+    // character, and a Backspace over a selection removes all of it rather than
+    // one character. Both are ordinary editing, and neither was accounted for:
+    // the keyup handler recorded a single `key` or a `len`-less `delete`, so a
+    // 400-character paragraph typed over left the trace claiming one character
+    // had changed. Same class of hole as the cut and undo/redo gaps the prior
+    // revisions closed — a mutation of the buffer with no record of its size —
+    // and the same three consequences: the trace stops being the canonical
+    // account of the document, `deletionRate` (which the integrity score reads)
+    // under-reports real revision work, and Phase 3.4's content-reconstruction
+    // check has a mutation it can't reconcile.
+    //
+    // Captured on *keydown*, because by keyup Monaco has already applied the
+    // edit and the selection is gone. Consumed exactly once by the keyup that
+    // follows and reset on read, so a keydown whose keyup is skipped (a
+    // navigation key, a command combo) can never leak its value into a later
+    // keystroke.
+    //
+    // Tab is deliberately excluded: with a selection, Monaco indents the
+    // selected lines rather than replacing them, so treating it as a removal
+    // would fabricate a deletion that never happened. Under-recording a rare
+    // Tab-over-selection is the status quo; inventing evidence is not.
+    let replacedByKeyDown = 0;
+    const takeReplacedLength = (): number => {
+      const len = replacedByKeyDown;
+      replacedByKeyDown = 0;
+      return len;
+    };
+
+    // Insert the writer's own copied text at the cursor, recording both halves
+    // of what the buffer does: an intra-editor paste over a selection *replaces*
+    // it, so it removes text as well as inserting it. Shared by the Cmd/Ctrl+V
+    // keydown branch and the native-paste route below, which reach the same
+    // allowed operation by different paths and must record it identically.
+    // The replaced length is measured here rather than taken from the keydown
+    // capture: `executeEdits()` has not run yet, so the selection is still
+    // intact on both paths, and the native route has no keydown of its own to
+    // read. The keydown capture is still *consumed* so it cannot leak into the
+    // next keystroke.
+    const applyInternalPaste = (text: string) => {
+      const selection = editor.getSelection();
+      if (!selection) return;
+      takeReplacedLength();
+      const replacedLength = selectionLength();
+      editor.executeEdits('internal-paste', [{ range: selection, text }]);
+      if (replacedLength > 0) {
+        recordEvent({
+          type: 'delete',
+          key: 'Replace',
+          pos: selection.startColumn,
+          len: replacedLength,
+        });
+      }
+      recordEvent({
+        type: 'paste_internal',
+        pos: selection.startColumn,
+        len: text.length,
+      });
+    };
+
+    // When the Cmd/Ctrl+V branch last handled a paste, so the native-paste
+    // guard below can tell "the keyboard path already dealt with this action"
+    // from "a genuinely separate paste attempt."
+    let lastKeyboardPasteAt = -1;
+
+    // A cut removes text from the document, so it is recorded as the deletion
+    // it is — carrying `len`, the way `paste_internal` carries the length it
+    // inserts, because a cut takes out a whole selection rather than one
+    // character. Reachable from two places (the Cmd/Ctrl+X keydown and the DOM
+    // `cut` event, which different platforms deliver differently), so it
+    // collapses calls landing within the same action into a single event rather
+    // than double-counting the deletion when both fire. The duplicate is matched
+    // on the cut text *and* a short window, not on time alone: both hooks run
+    // before Monaco applies the removal, so a duplicate is always the identical
+    // selection, and two genuinely separate cuts of the same text within 250ms
+    // would need the writer to reselect it in a window the removal has just
+    // made impossible.
+    const lastCut = { text: '', at: -1 };
+    const recordCut = () => {
+      const { text, pos } = syncInternalClipboard();
+      if (!text) return;
+      const now = Date.now();
+      if (text === lastCut.text && now - lastCut.at < 250) return;
+      lastCut.text = text;
+      lastCut.at = now;
+      recordEvent({ type: 'delete', key: 'Cut', pos, len: text.length });
+    };
+
     // Block external paste - intercept clipboard
     editor.onKeyDown((e) => {
+      // Read the selection this keystroke is about to replace before Monaco
+      // applies the edit — see `replacedByKeyDown` above for why the keyup
+      // handler can't do it itself.
+      replacedByKeyDown = e.code === 'Tab' ? 0 : selectionLength();
+
       // Handle paste attempt (Cmd+V / Ctrl+V)
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyV') {
         e.preventDefault();
         e.stopPropagation();
-        
+
+        lastKeyboardPasteAt = Date.now();
+
         // Check if we have internal clipboard content
         if (internalClipboard.current) {
           // Allow internal paste
-          const selection = editor.getSelection();
-          if (selection) {
-            editor.executeEdits('internal-paste', [{
-              range: selection,
-              text: internalClipboard.current,
-            }]);
-            recordEvent({
-              type: 'paste_internal',
-              pos: selection.startColumn,
-              len: internalClipboard.current.length,
-            });
-          }
+          applyInternalPaste(internalClipboard.current);
         } else {
           // Block external paste
           setBlockedPasteCount(prev => prev + 1);
+          flashPasteBlocked();
           recordEvent({
             type: 'paste_blocked',
             pos: editor.getPosition()?.column || 0,
@@ -80,26 +238,28 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
         }
         return;
       }
-      
-      // Handle copy (Cmd+C / Ctrl+C) - store in internal clipboard
+
+      // Handle copy (Cmd+C / Ctrl+C) — store in internal clipboard so an
+      // intra-editor paste of the writer's own text is recognised as internal.
+      // Allow default copy behavior for accessibility.
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyC') {
-        const selection = editor.getSelection();
-        if (selection) {
-          const selectedText = editor.getModel()?.getValueInRange(selection) || '';
-          internalClipboard.current = selectedText;
-        }
-        // Allow default copy behavior for accessibility
+        syncInternalClipboard();
         return;
       }
-      
-      // Handle cut (Cmd+X / Ctrl+X)
+
+      // Handle cut (Cmd+X / Ctrl+X). Allow the default cut, but *record the
+      // deletion it performs*. Previously this branch stored the clipboard and
+      // returned, and the keyup handler's meta/ctrl guard then skipped the
+      // keyup — so no path recorded anything, and a cut removed text from the
+      // document while the certified trace gained zero events. Verified in a
+      // browser before this fix: cutting a 16-character selection took the
+      // content from 63 chars to 47 with an empty trace. That is a hole in the
+      // core claim — the trace stops accounting for the document it is proof of
+      // — and it also under-reports `deletionRate`, which the integrity score
+      // reads, and leaves the Phase 3.4 "does the content reconstruct from the
+      // trace?" check nothing to reconstruct from.
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyX') {
-        const selection = editor.getSelection();
-        if (selection) {
-          const selectedText = editor.getModel()?.getValueInRange(selection) || '';
-          internalClipboard.current = selectedText;
-        }
-        // Allow default cut behavior
+        recordCut();
         return;
       }
     });
@@ -107,27 +267,83 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
     // Record keystrokes
     editor.onKeyUp((e) => {
       const pos = editor.getPosition()?.column || 0;
-      
+
       // Skip modifier keys
       if (['Meta', 'Control', 'Alt', 'Shift', 'CapsLock'].includes(e.code)) {
         return;
       }
-      
-      // Check if it's a deletion
+
+      // Check if it's a deletion. Checked before the command-combo guard below
+      // so a Cmd/Ctrl+Backspace (delete-word/delete-to-line-start) still counts
+      // as the deletion it is.
       if (e.code === 'Backspace' || e.code === 'Delete') {
+        // A Backspace over a selection removes the whole selection, not one
+        // character. Carry `len` the way a cut and an undo already do, so the
+        // trace records the size of what left the buffer; a plain
+        // single-character Backspace still records no `len`, which is what
+        // every consumer already reads as one (`event.len ?? 1`), so existing
+        // traces and the /verify playback are untouched.
+        const replaced = takeReplacedLength();
         recordEvent({
           type: 'delete',
           key: e.code,
           pos,
+          ...(replaced > 0 ? { len: replaced } : {}),
         });
         return;
       }
-      
-      // Record regular keystroke
-      if (e.code.startsWith('Key') || e.code.startsWith('Digit') || 
-          e.code === 'Space' || e.code === 'Enter' || 
+
+      // Skip command-shortcut keyups. The onKeyDown handler already processes
+      // Cmd/Ctrl+V (paste), +C (copy), and +X (cut), but it can't suppress the
+      // *keyup* for those combos — and any other shortcut (Cmd/Ctrl+A select-all,
+      // +Z undo, +S save) fires a keyup too. With no modifier guard here, each of
+      // those landed in the trace as a phantom `key` event: a blocked paste
+      // recorded both `paste_blocked` *and* a `KeyV` keystroke, an internal paste
+      // both `paste_internal` *and* a `KeyV`, and a copy/undo/select-all a bare
+      // `KeyC`/`KeyZ`/`KeyA` — none of which typed a character. Those phantoms
+      // inflate `longestBurst`, distort `avgKeystrokeInterval`/variance, and nudge
+      // playback's cursor past the real content. Skip meta combos (Cmd on macOS,
+      // never used for text entry) and ctrl-without-alt combos (a shortcut),
+      // while still recording Ctrl+Alt (AltGr) keyups so European-layout
+      // characters like € / @ remain captured. Inverse of the §6.20
+      // keystroke-coverage fix: that added missing real keys; this drops phantom
+      // command-combo keys.
+      if (e.metaKey || (e.ctrlKey && !e.altKey)) {
+        return;
+      }
+
+      // Record regular keystroke. Whitelist any KeyboardEvent.code that
+      // produces a printable character or a writing-relevant whitespace key,
+      // and explicitly skip navigation/function/lock/media keys. The old
+      // whitelist missed Minus/Equal/Slash/Backslash/Backquote/Tab and the
+      // entire Numpad family, so hyphens, dates ("5/17/2026"), backticks, and
+      // numbers typed on the numeric keypad never made it into the trace —
+      // which deflates variance, longestBurst, and pause counts on real
+      // human writing.
+      if (e.code.startsWith('Key') || e.code.startsWith('Digit') ||
+          e.code.startsWith('Numpad') ||
           e.code.startsWith('Bracket') || e.code.startsWith('Quote') ||
-          e.code === 'Comma' || e.code === 'Period' || e.code === 'Semicolon') {
+          e.code === 'Space' || e.code === 'Enter' || e.code === 'Tab' ||
+          e.code === 'Comma' || e.code === 'Period' || e.code === 'Semicolon' ||
+          e.code === 'Minus' || e.code === 'Equal' ||
+          e.code === 'Slash' || e.code === 'Backslash' ||
+          e.code === 'Backquote' || e.code === 'IntlBackslash') {
+        // Typing over a selection replaces it: the selection is removed and
+        // one character is inserted. Record the removal that the single `key`
+        // event below has never accounted for, so a select-all-and-retype is
+        // in the trace as the wholesale deletion it is rather than as one
+        // keystroke. `key: 'Replace'` names the verb the way 'Cut' / 'Undo' /
+        // 'Redo' do; no new event type is needed, since a removal is the
+        // `delete` it already is.
+        const replaced = takeReplacedLength();
+        if (replaced > 0) {
+          recordEvent({
+            type: 'delete',
+            key: 'Replace',
+            pos,
+            len: replaced,
+          });
+        }
         recordEvent({
           type: 'key',
           key: e.code,
@@ -136,97 +352,412 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
       }
     });
 
-    // Block drag-and-drop
-    editor.getDomNode()?.addEventListener('drop', (e) => {
+    // Undo and redo are the last routes that changed the document without
+    // leaving a record. `Cmd/Ctrl+Z` (and `Cmd+Shift+Z` / `Ctrl+Y`) reach
+    // Monaco's own undo stack directly: the keyup handler above deliberately
+    // skips command combos so they don't land in the trace as phantom
+    // keystrokes, and no other path saw them — so an undo removed text, or a
+    // redo put it back, and the certified trace gained nothing. Verified before
+    // this fix: an undo took the content from 71 characters to 65 and a redo
+    // returned it to 71, while the trace stayed at zero events across both.
+    //
+    // Same hole the cut fix closed, and the same reason it matters: the trace is
+    // meant to be the canonical account of how the document came to be, and a
+    // writer who drafts a sentence, undoes it, and rewrites it did real editing
+    // work that `deletionRate` (which the integrity score reads) never saw. It
+    // is also the remaining blocker on the Phase 3.4 "does the content
+    // reconstruct from the trace?" check, which can only be enforced once every
+    // mutation of the buffer is accounted for.
+    //
+    // Hooked on the model-change event rather than the keystrokes, because
+    // that is where the actual mutation and its true size are: one undo step can
+    // span several ranges, and its size has no relation to how many keys were
+    // pressed. `isUndoing`/`isRedoing` scope the listener to exactly those two
+    // verbs — every other edit (typing, the allowed internal paste, a cut) is
+    // already recorded by its own handler and skipped here, so nothing is
+    // double-counted. A step that both removes and inserts (undoing a paste that
+    // replaced a selection) records both halves, since the buffer did both.
+    //
+    // No new event type: a removal is the `delete` it already is and a
+    // re-insertion is the same bulk insert of the writer's own text that
+    // `paste_internal` describes, both carrying `len`. So the trace schema, the
+    // API's shape validation, and the `/verify` playback (which already honors
+    // `len` on both) are unchanged, and `key` records which verb it was.
+    editor.onDidChangeModelContent((e) => {
+      if (!e.isUndoing && !e.isRedoing) return;
+      const key = e.isUndoing ? 'Undo' : 'Redo';
+      for (const change of e.changes) {
+        const pos = change.range.startColumn;
+        if (change.rangeLength > 0) {
+          recordEvent({ type: 'delete', key, pos, len: change.rangeLength });
+        }
+        if (change.text.length > 0) {
+          recordEvent({ type: 'paste_internal', key, pos, len: change.text.length });
+        }
+      }
+    });
+
+    // Block every *other* route from the system clipboard into the editor.
+    // The onKeyDown handler above intercepts Cmd/Ctrl+V, but that is only one
+    // of the ways a paste actually happens: a long-press → Paste on mobile
+    // (where most of the traffic is, and where there is no Cmd+V at all),
+    // Shift+Insert on Windows/Linux, middle-click paste on X11, and the
+    // browser's own Edit ▸ Paste menu each produce a native `paste` event with
+    // no Cmd/Ctrl+V keydown for us to preventDefault.
+    //
+    // These guards used to be registered on `editor.getDomNode()` — one level
+    // too low to be reached. Monaco registers its own clipboard handlers on the
+    // editor's *container* (the parent of `.monaco-editor`) and stops the event
+    // there, so on the way down to the focused input the container runs first
+    // and the listeners below never saw a single native `paste`, `copy`, or
+    // `cut`. Verified against the running editor: a `paste` delivered to
+    // Monaco's `.native-edit-context` host — the element a real paste actually
+    // targets — inserted `PASTED_AI_TEXT_ABC` straight into the document, with
+    // the blocked-paste counter at **0** and the certified trace **empty**.
+    // That is the product's central promise failing on the majority platform:
+    // pasted text lands in the document and the certificate reports a clean
+    // session, because there is nothing in the trace to say otherwise. The same
+    // root cause silenced the other two verbs — a native `cut` removed a
+    // selection while recording nothing (the removal is meant to be a `delete`
+    // carrying its `len`), and a non-keyboard `copy` never populated the
+    // internal clipboard, so the writer's own text read as external on the way
+    // back in.
+    //
+    // Registered on `window` in the capture phase instead, which runs before
+    // any listener inside the editor's subtree no matter where Monaco attaches
+    // its own, and scoped to events whose target is inside this editor so the
+    // rest of the page (the title input above, which is not part of the
+    // certified trace) is untouched. The *allowed* intra-editor paste is
+    // unaffected: it is applied through `executeEdits()` and never produces a
+    // clipboard event.
+    const isInsideEditor = (e: Event): boolean => {
+      const node = editor.getDomNode();
+      return !!node && e.target instanceof Node && node.contains(e.target);
+    };
+
+    const onPaste = (e: ClipboardEvent) => {
+      if (!isInsideEditor(e)) return;
       e.preventDefault();
       e.stopPropagation();
+
+      // The Cmd/Ctrl+V keydown branch above already handled this action. It
+      // preventDefaults the keydown, so no native paste normally follows — but
+      // a platform that delivers both would otherwise paste twice, or count one
+      // attempt as two. Collapsed the same way `recordCut()` collapses a cut
+      // that trips both of its hooks.
+      if (Date.now() - lastKeyboardPasteAt < 250) return;
+
+      // Now that the event actually reaches us, the system clipboard is
+      // readable — so this route can make the *accurate* version of the
+      // judgement the keyboard route has to guess at, and allow a paste only
+      // when its content is exactly the text the writer copied inside this
+      // editor. Without it, a mobile writer moving their own paragraph was
+      // blocked and charged 10 integrity points for ordinary editing — the same
+      // false positive the non-keyboard `copy` hook exists to prevent, on the
+      // way back in. Anything else is external and blocked, whatever the
+      // internal clipboard happens to hold.
+      const pasted = e.clipboardData?.getData('text/plain') ?? '';
+      if (pasted && pasted === internalClipboard.current) {
+        applyInternalPaste(pasted);
+        return;
+      }
+
       setBlockedPasteCount(prev => prev + 1);
+      flashPasteBlocked();
       recordEvent({
         type: 'paste_blocked',
         pos: editor.getPosition()?.column || 0,
       });
-    });
+    };
 
-    editor.getDomNode()?.addEventListener('dragover', (e) => {
+    // Copy and cut are *allowed* operations — the lockdown is about what comes
+    // in from the system clipboard, not what the writer does with their own
+    // text — so neither is prevented; Monaco performs the removal and the
+    // clipboard write. `recordCut()` is idempotent within one action, so a
+    // route that fires both a Cmd/Ctrl+X keydown and a native `cut` still
+    // records the deletion exactly once.
+    const onCopy = (e: ClipboardEvent) => {
+      if (!isInsideEditor(e)) return;
+      syncInternalClipboard();
+    };
+
+    const onCut = (e: ClipboardEvent) => {
+      if (!isInsideEditor(e)) return;
+      recordCut();
+    };
+
+    // Block drag-and-drop
+    const onDrop = (e: DragEvent) => {
+      if (!isInsideEditor(e)) return;
       e.preventDefault();
-    });
+      e.stopPropagation();
+      setBlockedPasteCount(prev => prev + 1);
+      flashPasteBlocked();
+      recordEvent({
+        type: 'paste_blocked',
+        pos: editor.getPosition()?.column || 0,
+      });
+    };
+
+    const onDragOver = (e: DragEvent) => {
+      if (!isInsideEditor(e)) return;
+      e.preventDefault();
+    };
+
+    window.addEventListener('paste', onPaste, true);
+    window.addEventListener('copy', onCopy, true);
+    window.addEventListener('cut', onCut, true);
+    window.addEventListener('drop', onDrop, true);
+    window.addEventListener('dragover', onDragOver, true);
+
+    detachGuardsRef.current = () => {
+      window.removeEventListener('paste', onPaste, true);
+      window.removeEventListener('copy', onCopy, true);
+      window.removeEventListener('cut', onCut, true);
+      window.removeEventListener('drop', onDrop, true);
+      window.removeEventListener('dragover', onDragOver, true);
+    };
   };
 
   const handleEditorChange = (value: string | undefined) => {
-    const newContent = value || '';
-    lastContentRef.current = newContent;
-    setContent(newContent);
+    setContent(value || '');
   };
 
-  const handleSubmit = () => {
-    setIsRecording(false);
-    
-    const metrics = calculateMetrics(eventsRef.current);
-    const integrityScore = calculateIntegrityScore(metrics, wordCount, elapsedTime);
-    
+  // Auto-save the in-progress draft to localStorage. The full keystroke trace
+  // is preserved so a resumed session keeps integrity scoring intact.
+  //
+  // The persist callback reads from a ref instead of closure state so the
+  // 3-second interval can be set up once and tick steadily. Previously the
+  // effect's deps included `content`, so each keystroke cleared the interval
+  // and started a fresh 3000ms timer — meaning a writer typing continuously
+  // would never see an autosave fire until they paused for ≥3s (or closed the
+  // tab, which fires `beforeunload`).
+  const draftSnapshotRef = useRef({ title, content, blockedPasteCount });
+  useEffect(() => {
+    draftSnapshotRef.current = { title, content, blockedPasteCount };
+  }, [title, content, blockedPasteCount]);
+
+  // Set once the certification is confirmed, at which point the draft has been
+  // cleared and must never be written back. A ref, not state: `handleSubmit`
+  // sets it and clears the draft in the same synchronous step, so no autosave
+  // tick can interleave between the two and resurrect the draft we just
+  // deleted. (A state flag would only stop the interval on the *next* render.)
+  const draftFinalizedRef = useRef(false);
+
+  // Autosave runs for the whole life of the editor, stopping only when a
+  // certification actually succeeds. It used to stop the moment `handleSubmit`
+  // fired (an `isRecording` flag it set to false), and `handleSubmit` also
+  // deleted the saved draft outright — both *before* the parent's POST
+  // /api/documents had succeeded. So a certification that failed (a dropped
+  // connection, a 500, the server-side word-count/trace gates) left the writer
+  // back in the editor with their localStorage draft already erased *and*
+  // autosave permanently off for the rest of the session: from then on,
+  // closing the tab lost everything. That is precisely the event Phase 1.1
+  // exists to prevent ("an accidental tab-close erases work — that single
+  // event kills retention"), and a failed submit is exactly when a writer is
+  // most likely to close the tab. Saving now continues across a failure.
+  // What the last successful persist wrote. The autosave ticks every 3s for the
+  // whole life of the editor, and each tick used to `JSON.stringify()` the entire
+  // keystroke trace and hand it to a synchronous `localStorage.setItem()` —
+  // whether or not anything had changed since the previous tick. The trace only
+  // grows (up to the route's 250k-event cap), so on a long piece that is a
+  // multi-hundred-kilobyte serialize plus a blocking main-thread write, twenty
+  // times a minute, on the one surface where main-thread jank is felt directly:
+  // the writer is typing into it.
+  //
+  // Most of those writes are redundant by construction. A writer re-reading a
+  // paragraph, thinking (the deliberate pauses the integrity score exists to
+  // recognise), or sitting with the tab open re-serializes a byte-identical
+  // snapshot every three seconds indefinitely. Skipping those costs one length
+  // comparison and two string comparisons per tick.
+  //
+  // Events are only ever appended to `eventsRef.current`, never removed or
+  // rewritten, so the count is a sound change signal for the trace; a
+  // `paste_blocked` (which pushes an event without altering the content) is
+  // caught by it as well as by `blockedPasteCount`. `null` until the first
+  // persist, so the first tick after mount always writes — that write is what
+  // refreshes `savedAt` and so extends a resumed draft's 24h window, which
+  // `formatDraftExpiry()` documents as the behaviour of simply opening a draft
+  // again.
+  const lastPersistedRef = useRef<{
+    title: string;
+    content: string;
+    blockedPasteCount: number;
+    eventCount: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const persist = () => {
+      if (draftFinalizedRef.current) return;
+      const { title: t, content: c, blockedPasteCount: b } = draftSnapshotRef.current;
+      if (!c.trim() && !t.trim()) return;
+      const eventCount = eventsRef.current.length;
+      const last = lastPersistedRef.current;
+      if (
+        last &&
+        last.eventCount === eventCount &&
+        last.blockedPasteCount === b &&
+        last.title === t &&
+        last.content === c
+      ) {
+        return;
+      }
+      const snapshot: DraftSnapshot = {
+        sessionId,
+        title: t,
+        content: c,
+        events: eventsRef.current,
+        // Persist the original wall-clock start so resuming reconstructs the
+        // session's true `startedAt`; the rebased `startTime` is a runtime-only
+        // offset for keystroke timing math.
+        startTime: startedAt,
+        blockedPasteCount: b,
+        savedAt: Date.now(),
+      };
+      if (saveDraft(snapshot)) {
+        // Only after the write actually lands: a quota failure must leave the
+        // next tick free to retry rather than record a snapshot that isn't
+        // there.
+        lastPersistedRef.current = { title: t, content: c, blockedPasteCount: b, eventCount };
+      }
+    };
+
+    // `beforeunload` is the classic last-chance-to-save hook, but it is the one
+    // the mobile browsers don't guarantee: iOS Safari in particular does not
+    // fire it when a tab is backgrounded, when the app is switched away from,
+    // or when the page is discarded under memory pressure — the page goes
+    // straight to `pagehide`/`visibilityState === 'hidden'`. So on the devices
+    // that make up most of the traffic, the only save that ever ran was the 3s
+    // interval — and background tabs throttle timers aggressively, so even that
+    // stops once the writer switches apps. Everything typed since the last tick
+    // was simply lost. That is exactly the event Phase 1.1 exists to prevent
+    // ("an accidental tab-close erases work — that single event kills
+    // retention"), and it was going unhandled on the majority platform.
+    //
+    // `pagehide` and `visibilitychange` → hidden are what the platform actually
+    // guarantees here. `persist()` writes the same snapshot every time and is
+    // idempotent, so listening on all three costs nothing but a redundant
+    // `setItem` on the desktop path.
+    const persistOnHide = () => {
+      if (window.document.visibilityState === 'hidden') persist();
+    };
+
+    const interval = window.setInterval(persist, 3000);
+    window.addEventListener('beforeunload', persist);
+    window.addEventListener('pagehide', persist);
+    window.document.addEventListener('visibilitychange', persistOnHide);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('beforeunload', persist);
+      window.removeEventListener('pagehide', persist);
+      window.document.removeEventListener('visibilitychange', persistOnHide);
+    };
+  }, [sessionId, startedAt]);
+
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+
+    // Compute the writing window and word count live at submit time rather than
+    // reading the React state. `elapsedTime` is refreshed only once per second
+    // by the interval, so a writer who hits Complete within the first second
+    // (or between ticks) would submit a window truncated by up to ~1s — or 0
+    // before the first tick — which deflates the Duration cell, zeroes the WPM
+    // stat, and silently skips the >150/>200 WPM penalty in the integrity
+    // score. `Date.now() - startTime` is the same source the interval samples,
+    // just read at the precise moment of submission. `wordCount` state is
+    // likewise effect-synced; recompute from `content` so the certified count
+    // can't lag a final keystroke.
+    const activeWritingTime = Date.now() - startTime;
+    const finalWordCount = countWords(content);
+
+    const metrics = calculateMetrics(eventsRef.current, content);
+    const integrityScore = calculateIntegrityScore(metrics, finalWordCount, activeWritingTime);
+
     const session: WritingSession = {
       id: sessionId,
-      startedAt: startTime,
-      endedAt: Date.now(),
+      // Preserve the original wall-clock start (the moment the writer first
+      // opened the editor) so the certified record reflects when the piece
+      // actually began. The server recomputes `writingTimeMs` from
+      // `(endedAt - startedAt)`, so emit `endedAt = startedAt + activeWritingTime`
+      // — yielding the *active* writing window (resume gap excluded) which
+      // matches what the keystroke trace and integrity score reflect. Without
+      // this, a 23h-old resumed draft would persist a 23h+ writing window and
+      // tarnish WPM, the Duration cell, and the certificate PDF.
+      startedAt,
+      endedAt: startedAt + activeWritingTime,
       events: eventsRef.current,
       metrics,
       content,
-      wordCount,
+      wordCount: finalWordCount,
       integrityScore,
     };
-    
-    onComplete(session);
+
+    // Drop the local draft only once the certification is confirmed. Marking it
+    // finalized *before* clearing (both synchronous, so nothing can run between
+    // them) stops the autosave interval from writing the draft straight back —
+    // which would leave the writer facing a "Resume where you left off?" banner
+    // for a piece they had just successfully certified.
+    if (await onComplete(session)) {
+      draftFinalizedRef.current = true;
+      clearDraft();
+    }
   };
 
   const progressPercent = Math.min(100, (wordCount / 10) * 100);
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white">
-      {/* Header */}
-      <div className="flex-shrink-0 flex flex-col md:flex-row md:items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-deep-blue/10 bg-gradient-to-r from-cream to-white gap-3 md:gap-0">
-        <div className="flex items-center gap-3 md:gap-4">
+      {/* Toolbar */}
+      <div className="flex-shrink-0 flex flex-col md:flex-row md:items-center justify-between px-5 md:px-8 py-3 md:py-4 border-b border-deep-blue/[0.06] bg-cream gap-3 md:gap-0">
+        <div className="flex items-center gap-4">
           <input
             type="text"
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
             placeholder="Untitled Document"
-            className="text-lg md:text-xl font-semibold bg-transparent border-none outline-none text-deep-blue placeholder-deep-blue/30 w-full md:w-64 focus:placeholder-deep-blue/50 transition-colors"
+            // Match the API's canonical title cap at the point of entry. Before
+            // this, the editor accepted an arbitrarily long title while the
+            // server silently stored only the first 200 characters, so the
+            // success page/share copy could describe a different title from
+            // the durable verification page and certificate.
+            maxLength={MAX_DOCUMENT_TITLE_LENGTH}
+            // A `placeholder` is not a reliable accessible name: it disappears
+            // once the field has a value and isn't consistently announced as a
+            // label. Without `aria-label` this is an unlabeled edit field — the
+            // WCAG 2.1 Level A failure the §6.29 fix closed for the /success
+            // verification-link input — and it's the first control a writer
+            // touches in the editor. Accessibility is an always-on cross-cutting
+            // roadmap investment.
+            aria-label="Document title"
+            className="text-lg font-semibold bg-transparent border-none outline-none text-deep-blue placeholder-deep-blue/25 w-full md:w-72 focus:placeholder-deep-blue/40 transition-colors"
           />
-          {isRecording && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-              </span>
-              <span className="text-xs font-medium text-red-600">Recording</span>
+          {/* Driven by the live submission state rather than a one-way flag the
+              submit handler flipped and nothing ever flipped back. The pill
+              still goes dark while a certification is in flight (unchanged
+              visually), but a *failed* certification now relights it — the
+              writer really is still recording, since keystroke capture runs off
+              the editor's own key handlers and never stopped. */}
+          {!isSubmitting && (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="w-2 h-2 rounded-full bg-deep-blue/40 animate-pulse-recording" />
+              <span className="text-xs font-medium text-deep-blue/35 uppercase tracking-wider">Recording</span>
             </div>
           )}
         </div>
-        
-        <div className="flex items-center gap-4 md:gap-6 text-sm">
-          <div className="flex items-center gap-2 text-deep-blue/60">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="opacity-50">
-              <path d="M8 4V8L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5"/>
-            </svg>
-            <span className="font-mono">{formatDuration(elapsedTime)}</span>
-          </div>
-          <div className="flex items-center gap-2 text-deep-blue/60">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="opacity-50">
-              <path d="M3 4H13M3 8H10M3 12H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            <span className="font-medium">{wordCount} words</span>
-          </div>
+
+        <div className="flex items-center gap-5 text-sm text-deep-blue/40">
+          <span className="font-mono tabular-nums">{formatDuration(elapsedTime)}</span>
+          <span className="w-px h-3.5 bg-deep-blue/10" />
+          <span>{wordCount} {wordCount === 1 ? 'word' : 'words'}</span>
           {blockedPasteCount > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 rounded-full border border-orange-200">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-orange-500">
-                <path d="M8 6V8M8 10H8.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <path d="M3 14L8 3L13 14H3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <span className="text-xs font-medium text-orange-600">
+            <>
+              <span className="w-px h-3.5 bg-deep-blue/10" />
+              <span className="text-deep-blue/50">
                 {blockedPasteCount} paste{blockedPasteCount > 1 ? 's' : ''} blocked
               </span>
-            </div>
+            </>
           )}
         </div>
       </div>
@@ -246,16 +777,16 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
             fontSize: 17,
-            fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
+            fontFamily: 'var(--font-bricolage), system-ui, sans-serif',
             lineHeight: 1.9,
-            padding: { top: 32, bottom: 32 },
+            padding: { top: 40, bottom: 40 },
             renderWhitespace: 'none',
             overviewRulerBorder: false,
             hideCursorInOverviewRuler: true,
             scrollbar: {
               vertical: 'auto',
               horizontal: 'hidden',
-              verticalScrollbarSize: 8,
+              verticalScrollbarSize: 6,
             },
             quickSuggestions: false,
             suggestOnTriggerCharacters: false,
@@ -265,9 +796,9 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
             contextmenu: false,
           }}
         />
-        
+
         {/* Paste blocked overlay */}
-        <div 
+        <div
           className="absolute inset-0 pointer-events-none"
           onPaste={(e) => {
             e.preventDefault();
@@ -275,59 +806,95 @@ export default function LockedEditor({ onComplete, title, onTitleChange }: Locke
           }}
         />
 
+        {/* Blocked-paste notice. Sits at the bottom of the writing surface,
+            close to where the cursor and the writer's attention are, and fades
+            itself out after 3s so it never becomes chrome. Pointer-events are
+            off so it can't intercept a click into the editor.
+
+            The live region is the wrapper, which is now always mounted — only
+            its *contents* appear and disappear. A `role="status"` element that
+            is inserted into the DOM at the same moment as its text is not
+            reliably announced: screen readers watch regions they already know
+            about, so a region that arrives carrying its message often produces
+            silence. Previously the whole notice — region included — was
+            conditionally rendered, which is exactly that pattern, on the one
+            event the product exists to perform. The empty wrapper renders
+            nothing visible and costs nothing. */}
+        <div
+          role="status"
+          aria-live="polite"
+          className="absolute bottom-6 left-0 right-0 flex justify-center px-6 pointer-events-none"
+        >
+          {pasteBlockedNotice && (
+            <div className="max-w-sm px-4 py-2.5 bg-deep-blue text-cream text-xs leading-relaxed text-center rounded-full shadow-lg shadow-deep-blue/20">
+              External paste blocked — your words have to be typed here.
+            </div>
+          )}
+        </div>
+
         {/* Empty state hint */}
         {wordCount === 0 && (
-          <div className="absolute top-32 left-0 right-0 flex justify-center pointer-events-none">
-            <div className="text-deep-blue/20 text-sm italic">Start typing to begin your session...</div>
+          <div className="absolute top-36 left-0 right-0 flex justify-center pointer-events-none">
+            <p className="text-deep-blue/20 text-sm">Start typing to begin your session...</p>
           </div>
         )}
       </div>
 
       {/* Footer */}
-      <div className="flex-shrink-0 border-t border-deep-blue/10 bg-gradient-to-r from-cream to-white">
-        {/* Progress bar */}
-        <div className="h-1 bg-deep-blue/5">
-          <div 
-            className="h-full bg-gradient-to-r from-accent to-success transition-all duration-300 ease-out"
+      <div className="flex-shrink-0 border-t border-deep-blue/[0.06]">
+        {/* Progress toward the 10-word certification gate. Given
+            role="progressbar" semantics — the same a11y treatment the /verify
+            playback progressbar carries (§6.39) — so a screen-reader user
+            perceives how close they are to being able to certify, not just the
+            sighted writer watching the bar fill. `aria-valuenow` is capped at
+            the 10-word max so the value never overshoots; `aria-valuetext`
+            speaks the human phrasing the footer status shows. */}
+        <div
+          className="h-0.5 bg-deep-blue/[0.04]"
+          role="progressbar"
+          aria-label="Words toward the 10-word certification minimum"
+          aria-valuemin={0}
+          aria-valuemax={10}
+          aria-valuenow={Math.min(wordCount, 10)}
+          aria-valuetext={wordCount < 10 ? `${wordCount} of 10 words` : 'Ready to certify'}
+        >
+          <div
+            className="h-full bg-deep-blue/20 transition-all duration-500 ease-out"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
-        
-        <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
-          <div className="flex items-center gap-2 text-sm text-deep-blue/50">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="opacity-50">
-              <path d="M8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14Z" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M6 8L7.5 9.5L10 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <span>
-              {wordCount < 10 
-                ? `${10 - wordCount} more word${10 - wordCount === 1 ? '' : 's'} needed`
-                : 'Ready to certify!'
-              }
-            </span>
-          </div>
-          
+
+        <div className="flex items-center justify-between px-5 md:px-8 py-3 md:py-4 bg-cream">
+          <span className="text-sm text-deep-blue/35">
+            {wordCount < 10
+              ? `${10 - wordCount} more word${10 - wordCount === 1 ? '' : 's'} to certify`
+              : 'Ready to certify'
+            }
+          </span>
+
           <button
             onClick={handleSubmit}
-            disabled={wordCount < 10}
-            className="group flex items-center gap-2 px-5 md:px-6 py-2.5 bg-deep-blue text-cream rounded-xl font-medium 
+            disabled={wordCount < 10 || isSubmitting}
+            // `aria-busy` while the certification POST is in flight. The header
+            // announces "Certifying…" via a role="status" region, but the button
+            // the writer just pressed only went `disabled` — indistinguishable to
+            // assistive tech from "not yet 10 words." Marking it busy tells a
+            // screen-reader user the control is working, not merely unavailable.
+            // Same treatment as the certificate Download button (§6.54); no
+            // visual change.
+            aria-busy={isSubmitting}
+            className="group flex items-center gap-2 px-6 py-2.5 bg-deep-blue text-cream rounded-full font-medium text-sm
                        hover:bg-deep-blue/90 transition-all duration-200
-                       disabled:opacity-40 disabled:cursor-not-allowed
-                       enabled:shadow-lg enabled:shadow-deep-blue/20 enabled:hover:shadow-xl enabled:hover:shadow-deep-blue/30
+                       disabled:opacity-30 disabled:cursor-not-allowed
                        enabled:hover:-translate-y-0.5"
           >
-            {wordCount < 10 ? (
-              <>
-                <span>Complete</span>
-                <span className="text-cream/60 text-sm">({wordCount}/10)</span>
-              </>
-            ) : (
-              <>
-                <span>Complete</span>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="group-hover:translate-x-0.5 transition-transform">
-                  <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </>
+            Complete
+            {wordCount >= 10 && !isSubmitting && (
+              // Decorative — "Complete" is the button's accessible name; the
+              // arrow is a hover affordance, not information.
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="group-hover:translate-x-0.5 transition-transform">
+                <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             )}
           </button>
         </div>
