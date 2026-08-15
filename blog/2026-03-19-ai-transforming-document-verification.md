@@ -40,10 +40,10 @@ For organizations considering AI integration into their document verification pr
 1. **Assess Your Needs**: Evaluate your current verification processes to identify pain points that AI could address. Focus on areas where accuracy and speed are crucial.
 2. **Start Small**: Consider piloting an AI solution on a limited scale. This approach allows you to evaluate its effectiveness before a full-scale implementation.
 3. **Invest in Training**: Ensure your team is equipped to work alongside AI systems. Training is essential to maximize the benefits of automation while maintaining the quality of oversight.
-4. **Stay Informed**: Keep abreast of the latest developments in AI and regulatory changes. Resources like [Navigating Document Verification in a Digital Age](/blog/2026-03-18-navigating-document-verification-digital-age) provide valuable insights into industry trends.
+4. **Stay Informed**: Keep abreast of the latest developments in AI and regulatory changes. Resources like [Navigating Document Verification in a Digital Age](/blog/navigating-document-verification-digital-age) provide valuable insights into industry trends.
 
 ## Conclusion
 
 The integration of AI into document verification processes is not just a future consideration; it is a present necessity. As we continue to see advancements in technology and regulatory frameworks, organizations must adapt to secure their operations effectively. By embracing AI, you can enhance the integrity of your document verification processes while gaining a competitive edge.
 
-Explore [why document verification is key to preventing fraud](/blog/2026-03-19-document-verification-key-preventing-fraud), then see how ByMyOwnHand can support a transition toward smarter document verification.
+Explore [why document verification is key to preventing fraud](/blog/document-verification-key-preventing-fraud), then see how ByMyOwnHand can support a transition toward smarter document verification.

@@ -7,7 +7,7 @@ author: "Looper Bot"
 seo:
   title: "Navigating Document Verification in a Digital Age"
   description: "Explore the evolving landscape of document verification and how it impacts industries, with insights on leveraging technology for authenticity."
-  canonical: "https://bymyownhand.com/blog/2026-03-18-navigating-document-verification-digital-age"
+  canonical: "https://bymyownhand.com/blog/navigating-document-verification-digital-age"
 ---
 
 # Navigating Document Verification in a Digital Age
@@ -42,7 +42,7 @@ ByMyOwnHand is positioned to support businesses navigating this complex landscap
 
 As the demand for secure document verification continues to rise, businesses must adapt to these changes by embracing technology and innovative solutions. By understanding the current trends and leveraging tools like ByMyOwnHand, organizations can enhance their document verification processes, ensuring authenticity and compliance in a digital world.
 
-If you're looking to improve your document verification strategy, explore [how AI is transforming document verification](/blog/2026-03-19-ai-transforming-document-verification) and [why document verification is key to preventing fraud](/blog/2026-03-19-document-verification-key-preventing-fraud).
+If you're looking to improve your document verification strategy, explore [how AI is transforming document verification](/blog/ai-transforming-document-verification) and [why document verification is key to preventing fraud](/blog/document-verification-key-preventing-fraud).
 
 ## Frequently Asked Questions
 

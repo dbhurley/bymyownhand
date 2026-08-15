@@ -43,6 +43,6 @@ To combat fraud, organizations need to adopt a robust document verification stra
 
 The rise in fraud is a call to action for all businesses. Document verification is not just a compliance requirement; it is a crucial component of a comprehensive fraud prevention strategy. By enhancing your verification processes, you not only protect your organization but also build trust with your customers.
 
-For further reading, see [How AI is Transforming Document Verification Today](/blog/2026-03-19-ai-transforming-document-verification) and [Navigating Document Verification in a Digital Age](/blog/2026-03-18-navigating-document-verification-digital-age).
+For further reading, see [How AI is Transforming Document Verification Today](/blog/ai-transforming-document-verification) and [Navigating Document Verification in a Digital Age](/blog/navigating-document-verification-digital-age).
 
 Don’t wait until it’s too late—invest in effective document verification today.
